@@ -1,15 +1,121 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "cbe-picker-visited-v1";
+  const STORAGE_KEY_V1 = "cbe-picker-visited-v1";
+  const STORAGE_KEY = "cbe-picker-state-v2";
+  const SETTINGS_KEY = "cbe-picker-settings-v1";
+  const CBE_CENTER = { lat: 11.0168, lng: 76.9558 };
+  const CBE_RADIUS_KM = 40;
+  const CBE_BBOX = "76.80,10.85,77.18,11.22";
+  const CBE_PROXIMITY = "76.9558,11.0168";
+  /** Bump when JS/JSON change so GitHub/raw.githack previews do not keep a stale app.js. */
+  const ASSET_V = "20260919-7";
+  /** Used if autocomplete-seed.json fails to load (common on cached previews). */
+  const FALLBACK_SEED = [
+    {
+      id: "seed-the-asian-stories",
+      name: "The Asian Stories",
+      aliases: ["Asian Stories", "The Asian Stories Saibaba Colony"],
+      area: "Saibaba Colony",
+      address:
+        "First Floor, No. 6, Bharathi Park 4th Cross Road, beside Jain Temple, Saibaba Colony, Coimbatore",
+      cuisine: "Pan-Asian",
+      type: "Restaurant",
+      lat: null,
+      lng: null,
+      sources: [
+        "https://www.zomato.com/coimbatore/the-asian-stories-saibaba-colony",
+        "https://www.swiggy.com/restaurants/coimbatore/sai-baba-colony/the-asian-stories-926542/dineout",
+      ],
+    },
+  ];
+
+  /** Neighbourhood buckets so detailed hotel addresses still filter as RS Puram / Race Course / etc. */
+  const AREA_RULES = [
+    { label: "RS Puram", test: /rs\s*puram/i },
+    { label: "Gandhipuram", test: /gandhipuram/i },
+    { label: "Race Course", test: /race\s*course/i },
+    { label: "Saibaba Colony", test: /saibaba/i },
+    { label: "Ram Nagar", test: /ram\s*nagar/i },
+    { label: "Neelambur", test: /neelambur/i },
+    { label: "Ukkadam", test: /ukkadam|selvapuram/i },
+    { label: "Gopalapuram", test: /gopalapuram/i },
+    { label: "Sitra", test: /sitra|kalapatti|broadway/i },
+    { label: "Lakshmi Mills", test: /lakshmi\s*mills|puliakulam/i },
+    { label: "Peelamedu", test: /peelamedu|goldwins/i },
+    { label: "Airport Road", test: /airport/i },
+    { label: "Avinashi Road", test: /avinashi/i },
+  ];
+
+  const CUISINE_RULES = [
+    { label: "South Indian", test: /south\s*indian|tamil|kongu|chettinad|paniyaram/i },
+    { label: "North Indian", test: /north\s*indian|mughlai|\bkebabs?\b/i },
+    { label: "Italian", test: /italian/i },
+    { label: "Asian", test: /pan-?asian|asian|chinese|korean|japanese|thai|sushi/i },
+    { label: "Café", test: /caf[eé]|bakery|tea\s*caf/i },
+    { label: "Continental / European", test: /continental|european/i },
+    { label: "Multi-cuisine", test: /multi-?cuisine|fusion/i },
+    { label: "Desserts", test: /dessert|ice\s*cream|chocolate/i },
+    { label: "Bar & pub", test: /bar\s*food|\bpub\b|restobar|rooftop\s*bar/i },
+  ];
+
+  const DISH_VIBES = {
+    "South Indian": [
+      "dosa", "idli", "sambar", "vada", "uttapam", "uttappam", "pongal",
+      "paniyaram", "parotta", "porotta", "appam", "puttu", "chettinad",
+      "kozhi", "meals", "thali", "filter coffee", "rasam", "kuzhambu",
+      "ghee roast", "poori", "puri", "biryani", "fish curry", "chicken 65",
+      "mutton", "kari", "idiyappam", "kootu", "poriyal", "payasam",
+    ],
+    "North Indian": [
+      "butter chicken", "naan", "paneer", "dal makhani", "dal", "tandoori",
+      "kebab", "roti", "chole", "tikka", "korma", "kulcha", "biryani",
+      "butter naan", "lassi", "saag", "kadai", "malai",
+    ],
+    Italian: [
+      "pizza", "pasta", "risotto", "lasagna", "tiramisu", "gnocchi",
+      "bruschetta", "carbonara", "penne", "spaghetti", "ravioli", "gelato",
+    ],
+    Asian: [
+      "sushi", "ramen", "dim sum", "noodles", "dumpling", "manchurian",
+      "fried rice", "momos", "thai", "curry", "bao", "teriyaki", "bibimbap",
+    ],
+    Café: [
+      "coffee", "croissant", "sandwich", "pastry", "cake", "waffle",
+      "souffle", "soufflé", "chocolate", "chai", "brownie", "cookie",
+      "latte", "cappuccino", "tea",
+    ],
+    "Continental / European": [
+      "steak", "grill", "salad", "soup", "pasta", "sandwich", "roast",
+      "fish", "chicken", "bread",
+    ],
+    "Multi-cuisine": ["thali", "biryani", "pizza", "noodles", "grill"],
+    Desserts: [
+      "ice cream", "cake", "brownie", "souffle", "soufflé", "chocolate",
+      "pastry", "kulfi", "payasam", "gelato", "waffle",
+    ],
+    "Bar & pub": ["nachos", "wings", "fries", "cocktail", "beer", "pizza", "sliders"],
+  };
 
   /** @type {Array<Object>} */
+  let curated = [];
+  /** @type {Array<Object>} */
+  let customPlaces = [];
+  /** @type {Set<string>} curated ids hidden in this browser */
+  let hiddenIds = new Set();
+  let lastRemoved = null;
+  /** @type {Array<Object>} */
   let restaurants = [];
+  /** @type {Array<Object>} */
+  let autocompleteSeed = [];
   /** @type {Set<string>} */
   let visited = new Set();
+  /** @type {Record<string, {rating:number|null, dishes:string[]}>} */
+  let notes = {};
   /** @type {"all"|"untried"|"visited"} */
   let statusFilter = "all";
   let areaFilter = "";
+  let cuisineFilter = "";
   let searchQuery = "";
   /** @type {{lat:number,lng:number}|null} */
   let userCoords = null;
@@ -20,15 +126,56 @@
   const emptyEl = $("#empty-state");
   const listMeta = $("#list-meta");
   const areaSelect = $("#area-filter");
+  const cuisineSelect = $("#cuisine-filter");
   const searchInput = $("#search");
   const geoStatus = $("#geo-status");
   const suggestPanel = $("#suggest-panel");
   const suggestList = $("#suggest-list");
   const suggestTitle = $("#suggest-title");
+  const addForm = $("#add-form");
+  const addName = $("#add-name");
+  const addArea = $("#add-area");
+  const addCuisine = $("#add-cuisine");
+  const addGoogle = $("#add-google");
+  const areaDatalist = $("#area-suggestions");
+  const cuisineDatalist = $("#cuisine-suggestions");
+  const placeSuggestList = $("#place-suggest-list");
+  const placeSuggestLive = $("#place-suggest-live");
+  const placesSettings = $("#places-settings");
+  const googleKeyInput = $("#google-key");
+  const mapboxTokenInput = $("#mapbox-token");
+  const placesProviderStatus = $("#places-provider-status");
+  const addLookupHint = $("#add-lookup-hint");
 
-  function loadVisited() {
+  let settings = { googlePlacesApiKey: "", mapboxAccessToken: "" };
+  let googleSessionError = "";
+  let mapboxSessionError = "";
+  let mapboxSessionId = "";
+  let suggestTimer = 0;
+  let suggestAbort = null;
+  let suggestItems = [];
+  let suggestActive = -1;
+  let suggestQuery = "";
+
+  function loadState() {
+    visited = new Set();
+    notes = {};
+    customPlaces = [];
+    hiddenIds = new Set();
+    lastRemoved = null;
+
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const rawV2 = localStorage.getItem(STORAGE_KEY);
+      if (rawV2) {
+        applyStatePayload(JSON.parse(rawV2));
+        return;
+      }
+    } catch {
+      /* fall through to v1 */
+    }
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_V1);
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -41,8 +188,315 @@
     }
   }
 
-  function saveVisited() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...visited]));
+  function emptySettings() {
+    return { googlePlacesApiKey: "", mapboxAccessToken: "" };
+  }
+
+  function loadSettings() {
+    settings = emptySettings();
+    googleSessionError = "";
+    mapboxSessionError = "";
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.googlePlacesApiKey === "string") {
+        settings.googlePlacesApiKey = parsed.googlePlacesApiKey.trim();
+      }
+      if (parsed && typeof parsed.mapboxAccessToken === "string") {
+        settings.mapboxAccessToken = parsed.mapboxAccessToken.trim();
+      }
+    } catch {
+      settings = emptySettings();
+    }
+  }
+
+  function saveSettings() {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        googlePlacesApiKey: settings.googlePlacesApiKey,
+        mapboxAccessToken: settings.mapboxAccessToken,
+      })
+    );
+    refreshPlacesProviderStatus();
+  }
+
+  function hasGoogleKey() {
+    return Boolean(settings.googlePlacesApiKey) && !googleSessionError;
+  }
+
+  function hasMapboxToken() {
+    return Boolean(settings.mapboxAccessToken) && !mapboxSessionError;
+  }
+
+  function openPlacesSettings(focusEl) {
+    hidePlaceSuggest();
+    placesSettings.hidden = false;
+    $("#btn-places-settings").setAttribute("aria-expanded", "true");
+    (focusEl || mapboxTokenInput || googleKeyInput)?.focus();
+  }
+
+  function parseMapboxToken(raw) {
+    const token = String(raw || "").trim();
+    if (!token) return "";
+    if (token.startsWith("sk.")) {
+      throw new Error("Use a public pk. token, not a secret sk. token.");
+    }
+    if (!token.startsWith("pk.")) {
+      throw new Error("Mapbox public tokens start with pk.");
+    }
+    return token;
+  }
+
+  function refreshPlacesProviderStatus() {
+    if (!placesProviderStatus) return;
+    if (settings.mapboxAccessToken && !mapboxSessionError) {
+      placesProviderStatus.textContent =
+        "Using Mapbox Search Box, biased to Coimbatore. Public token stays in this browser only.";
+    } else if (settings.mapboxAccessToken && mapboxSessionError) {
+      placesProviderStatus.textContent = `Mapbox token saved but requests failed (${mapboxSessionError}). Falling back to ${
+        hasGoogleKey() ? "Google Places, then " : ""
+      }the verified Coimbatore list + OpenStreetMap.`;
+    } else if (settings.googlePlacesApiKey && !googleSessionError) {
+      placesProviderStatus.textContent =
+        "Using Google Places Autocomplete (New), biased to Coimbatore. Key stays in this browser only.";
+    } else if (settings.googlePlacesApiKey && googleSessionError) {
+      placesProviderStatus.textContent = `Google key saved but requests failed (${googleSessionError}). Falling back to the verified Coimbatore list + OpenStreetMap.`;
+    } else {
+      placesProviderStatus.textContent =
+        "No Mapbox token — using the verified Coimbatore list + OpenStreetMap. Paste a Mapbox pk. token for live matches (Google Cloud billing is optional and often blocked in India).";
+    }
+    if (addLookupHint) {
+      if (hasMapboxToken()) {
+        addLookupHint.textContent =
+          "Live suggestions: your list, Mapbox Search, and the verified Coimbatore index.";
+      } else if (hasGoogleKey()) {
+        addLookupHint.textContent =
+          "Live suggestions: your list, Google Places, and the verified Coimbatore index.";
+      } else {
+        addLookupHint.innerHTML = `Live suggestions: your list + a verified Coimbatore index + OSM. <button type="button" class="hint-link" id="hint-open-places">Add a Mapbox token</button> for live matches (OSM often has gaps; Google Cloud billing is optional).`;
+        const hintBtn = $("#hint-open-places");
+        if (hintBtn) {
+          hintBtn.addEventListener("click", () => openPlacesSettings(mapboxTokenInput));
+        }
+      }
+    }
+    if (mapboxTokenInput && mapboxTokenInput !== document.activeElement) {
+      mapboxTokenInput.value = settings.mapboxAccessToken;
+    }
+    if (googleKeyInput && googleKeyInput !== document.activeElement) {
+      googleKeyInput.value = settings.googlePlacesApiKey;
+    }
+  }
+
+  function readVisitedList(parsed) {
+    if (Array.isArray(parsed)) return parsed.filter((id) => typeof id === "string");
+    if (parsed && Array.isArray(parsed.visited)) {
+      return parsed.visited.filter((id) => typeof id === "string");
+    }
+    return null;
+  }
+
+  function readNotesMap(raw) {
+    const out = {};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    for (const [id, n] of Object.entries(raw)) {
+      if (typeof id !== "string" || !n || typeof n !== "object") continue;
+      out[id] = normalizeNotes(n);
+    }
+    return out;
+  }
+
+  function readCustomList(raw) {
+    if (!Array.isArray(raw)) return [];
+    const byId = new Map();
+    for (const place of raw) {
+      const normalized = normalizeCustomPlace(place);
+      if (normalized) byId.set(normalized.id, normalized);
+    }
+    return [...byId.values()];
+  }
+
+  function applyStatePayload(parsed) {
+    const ids = readVisitedList(parsed) || [];
+    visited = new Set(ids);
+    notes = readNotesMap(parsed && parsed.notes);
+    customPlaces = readCustomList(parsed && parsed.customPlaces);
+    hiddenIds = new Set([
+      ...readIdList(parsed && parsed.hiddenIds),
+      ...readIdList(parsed && parsed.removedIds),
+    ]);
+  }
+
+  function readIdList(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((id) => typeof id === "string" && id.trim());
+  }
+
+  function normalizeNotes(n) {
+    const rating =
+      typeof n.rating === "number" && n.rating >= 1 && n.rating <= 5
+        ? Math.round(n.rating)
+        : null;
+    const dishes = Array.isArray(n.dishes)
+      ? n.dishes.map((d) => String(d).trim()).filter(Boolean)
+      : [];
+    return { rating, dishes };
+  }
+
+  function normalizeCustomPlace(place) {
+    if (!place || typeof place !== "object") return null;
+    const name = String(place.name || "").trim();
+    if (!name) return null;
+    const id =
+      typeof place.id === "string" && place.id
+        ? place.id
+        : newCustomId(name);
+    const googleRating = parseGoogleRating(place.googleRating);
+    return {
+      id,
+      name,
+      area: String(place.area || "").trim(),
+      cuisine: String(place.cuisine || "").trim(),
+      price: String(place.price || ""),
+      blurb: String(place.blurb || ""),
+      tags: Array.isArray(place.tags) ? place.tags : ["added_by_you"],
+      lat: typeof place.lat === "number" ? place.lat : null,
+      lng: typeof place.lng === "number" ? place.lng : null,
+      sources: Array.isArray(place.sources) ? place.sources : [],
+      googleRating,
+      custom: true,
+      createdAt: place.createdAt || new Date().toISOString(),
+      external:
+        place.external && place.external.provider && place.external.id
+          ? {
+              provider: String(place.external.provider),
+              id: String(place.external.id),
+            }
+          : null,
+    };
+  }
+
+  function parseGoogleRating(raw) {
+    if (raw === "" || raw == null) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 5) return null;
+    return Math.round(n * 10) / 10;
+  }
+
+  function saveState() {
+    const payload = {
+      version: 2,
+      visited: [...visited],
+      notes,
+      customPlaces,
+      hiddenIds: [...hiddenIds],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY_V1, JSON.stringify([...visited]));
+  }
+
+  function getNotes(id) {
+    return notes[id] ? { ...notes[id], dishes: [...notes[id].dishes] } : { rating: null, dishes: [] };
+  }
+
+  function putNotes(id, next) {
+    const rating = next.rating && next.rating >= 1 && next.rating <= 5 ? next.rating : null;
+    const dishes = Array.isArray(next.dishes)
+      ? next.dishes.map((d) => String(d).trim()).filter(Boolean)
+      : [];
+    if (!rating && dishes.length === 0) delete notes[id];
+    else notes[id] = { rating, dishes };
+    saveState();
+  }
+
+  function rebuildRestaurants() {
+    restaurants = [...curated.filter((r) => !hiddenIds.has(r.id)), ...customPlaces];
+  }
+
+  function removePlace(r) {
+    const custom = isCustom(r);
+    const ok = window.confirm(
+      custom
+        ? `Remove “${r.name}” from your list? This deletes the place you added.`
+        : `Remove “${r.name}” from your list? It stays hidden in this browser — the shared restaurants.json is unchanged.`
+    );
+    if (!ok) return;
+    lastRemoved = {
+      kind: custom ? "custom" : "curated",
+      place: custom
+        ? JSON.parse(JSON.stringify(customPlaces.find((p) => p.id === r.id) || r))
+        : { id: r.id, name: r.name },
+      wasVisited: visited.has(r.id),
+      notes: notes[r.id] ? getNotes(r.id) : null,
+    };
+    if (custom) {
+      customPlaces = customPlaces.filter((p) => p.id !== r.id);
+      visited.delete(r.id);
+      delete notes[r.id];
+    } else {
+      hiddenIds.add(r.id);
+    }
+    saveState();
+    rebuildRestaurants();
+    refreshFilterOptions();
+    updateStats();
+    renderList();
+    setStatus(`Removed ${r.name} from your list.`, false, { undo: undoLastRemove });
+  }
+
+  function undoLastRemove() {
+    const snap = lastRemoved;
+    lastRemoved = null;
+    if (!snap || !snap.place) return;
+    if (snap.kind === "custom") {
+      const restored = normalizeCustomPlace(snap.place);
+      if (restored && !customPlaces.some((p) => p.id === restored.id)) {
+        customPlaces.push(restored);
+      }
+      if (snap.wasVisited) visited.add(snap.place.id);
+      if (snap.notes) {
+        notes[snap.place.id] = {
+          rating: snap.notes.rating,
+          dishes: [...(snap.notes.dishes || [])],
+        };
+      }
+    } else {
+      hiddenIds.delete(snap.place.id);
+    }
+    saveState();
+    rebuildRestaurants();
+    refreshFilterOptions();
+    updateStats();
+    renderList();
+    setStatus(`Restored ${snap.place.name}.`);
+    requestAnimationFrame(() => {
+      document.querySelector(`.card[data-id="${CSS.escape(snap.place.id)}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }
+
+  function neighbourhood(area) {
+    const raw = String(area || "").trim();
+    if (!raw) return "Unspecified";
+    for (const rule of AREA_RULES) {
+      if (rule.test.test(raw)) return rule.label;
+    }
+    return raw;
+  }
+
+  function cuisineGroupsFor(r) {
+    const c = String(r.cuisine || "");
+    const groups = [];
+    for (const rule of CUISINE_RULES) {
+      if (rule.test.test(c)) groups.push(rule.label);
+    }
+    if (groups.length === 0 && /indian/i.test(c)) groups.push("Indian");
+    if (groups.length === 0 && c.trim()) groups.push(c.trim());
+    return groups;
   }
 
   function haversineKm(a, b) {
@@ -62,6 +516,74 @@
     return typeof r.lat === "number" && typeof r.lng === "number";
   }
 
+  function mapsQueryFor(r) {
+    if (hasCoords(r)) return `${r.lat},${r.lng}`;
+    return [r.name, r.area, "Coimbatore"].filter(Boolean).join(", ");
+  }
+
+  function mapsSearchUrl(r) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQueryFor(r))}`;
+  }
+
+  function mapsDirectionsUrl(r) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapsQueryFor(r))}`;
+  }
+
+  function httpSources(r) {
+    return (Array.isArray(r.sources) ? r.sources : []).filter((url) => /^https?:\/\//i.test(String(url)));
+  }
+
+  function sourceHost(url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  }
+
+  function isZomatoUrl(url) {
+    return /zomato\.com$/i.test(sourceHost(url)) || /(^|\.)zomato\.com$/i.test(sourceHost(url));
+  }
+
+  function zomatoAction(r) {
+    const existing = httpSources(r).find((url) => isZomatoUrl(url));
+    if (existing) {
+      return { href: existing, label: "Open on Zomato", search: false };
+    }
+    return {
+      href: `https://www.zomato.com/coimbatore/restaurants?q=${encodeURIComponent(r.name)}`,
+      label: "Search on Zomato",
+      search: true,
+    };
+  }
+
+  function sourceActionLabel(url) {
+    const host = sourceHost(url);
+    if (/thehindu\.com/i.test(host)) return "The Hindu";
+    if (/ndtv\.com/i.test(host)) return "NDTV";
+    if (/swiggy\.com/i.test(host)) return "Swiggy";
+    if (/tripadvisor\./i.test(host)) return "TripAdvisor";
+    if (/openstreetmap\.org/i.test(host)) return "OpenStreetMap";
+    if (/district\.in/i.test(host)) return "district.in";
+    if (/google\./i.test(host)) return "Google listing";
+    if (host) return "Website";
+    return "Source";
+  }
+
+  function placeActionLinks(r) {
+    const zomato = zomatoAction(r);
+    const extras = httpSources(r)
+      .filter((url) => !isZomatoUrl(url))
+      .slice(0, 2)
+      .map((url) => ({ href: url, label: sourceActionLabel(url) }));
+    return [
+      { href: mapsSearchUrl(r), label: "Maps" },
+      { href: mapsDirectionsUrl(r), label: "Directions" },
+      zomato,
+      ...extras,
+    ];
+  }
+
   function formatDistance(km) {
     if (km < 1) return `${Math.round(km * 1000)} m away`;
     return `${km.toFixed(1)} km away`;
@@ -71,34 +593,121 @@
     return String(tag).replace(/_/g, " ");
   }
 
+  function slugify(name) {
+    const slug = String(name)
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40);
+    return slug || "place";
+  }
+
+  function newCustomId(name) {
+    return `custom-${slugify(name)}-${Date.now().toString(36)}`;
+  }
+
+  function isCustom(r) {
+    return Boolean(r && (r.custom || String(r.id).startsWith("custom-")));
+  }
+
+  function setStatus(message, isError, actions) {
+    geoStatus.classList.toggle("is-error", Boolean(isError));
+    geoStatus.replaceChildren();
+    if (!message) return;
+    const text = document.createElement("span");
+    text.textContent = message;
+    geoStatus.appendChild(text);
+    if (actions && typeof actions.undo === "function") {
+      geoStatus.appendChild(document.createTextNode(" "));
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hint-link";
+      btn.textContent = "Undo";
+      btn.addEventListener("click", actions.undo);
+      geoStatus.appendChild(btn);
+    }
+  }
+
+  function uniqueSorted(values) {
+    return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }
+
+  function fillSelect(select, values, current, allLabel) {
+    select.innerHTML = "";
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = allLabel;
+    select.appendChild(all);
+    for (const value of values) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = value;
+      select.appendChild(opt);
+    }
+    if (current && values.includes(current)) select.value = current;
+    else select.value = "";
+    return select.value;
+  }
+
+  function fillDatalist(listEl, values) {
+    listEl.innerHTML = "";
+    for (const value of values) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      listEl.appendChild(opt);
+    }
+  }
+
+  function refreshFilterOptions() {
+    const areas = uniqueSorted(restaurants.map((r) => neighbourhood(r.area)));
+    const unspecified = areas.indexOf("Unspecified");
+    if (unspecified >= 0) {
+      areas.splice(unspecified, 1);
+      areas.push("Unspecified");
+    }
+    areaFilter = fillSelect(areaSelect, areas, areaFilter, "All areas");
+
+    const cuisines = uniqueSorted(restaurants.flatMap((r) => cuisineGroupsFor(r)));
+    cuisineFilter = fillSelect(cuisineSelect, cuisines, cuisineFilter, "All cuisines");
+
+    fillDatalist(
+      areaDatalist,
+      uniqueSorted([
+        ...AREA_RULES.map((r) => r.label),
+        ...restaurants.map((r) => r.area).filter(Boolean),
+      ])
+    );
+    fillDatalist(
+      cuisineDatalist,
+      uniqueSorted([
+        ...CUISINE_RULES.map((r) => r.label),
+        ...restaurants.map((r) => r.cuisine).filter(Boolean),
+      ])
+    );
+  }
+
   function updateStats() {
     const total = restaurants.length;
     const v = [...visited].filter((id) => restaurants.some((r) => r.id === id)).length;
     $("#stat-total").textContent = String(total);
     $("#stat-visited").textContent = String(v);
     $("#stat-remaining").textContent = String(total - v);
-  }
-
-  function populateAreas() {
-    const areas = [...new Set(restaurants.map((r) => r.area))].sort((a, b) =>
-      a.localeCompare(b)
-    );
-    for (const area of areas) {
-      const opt = document.createElement("option");
-      opt.value = area;
-      opt.textContent = area;
-      areaSelect.appendChild(opt);
-    }
+    const customCount = customPlaces.length;
+    const customStat = $("#stat-custom");
+    if (customStat) customStat.textContent = String(customCount);
   }
 
   function matchesFilters(r) {
     const isVisited = visited.has(r.id);
     if (statusFilter === "untried" && isVisited) return false;
     if (statusFilter === "visited" && !isVisited) return false;
-    if (areaFilter && r.area !== areaFilter) return false;
+    if (areaFilter && neighbourhood(r.area) !== areaFilter) return false;
+    if (cuisineFilter && !cuisineGroupsFor(r).includes(cuisineFilter)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      const hay = `${r.name} ${r.cuisine}`.toLowerCase();
+      const n = getNotes(r.id);
+      const hay = `${r.name} ${r.cuisine} ${r.area} ${neighbourhood(r.area)} ${n.dishes.join(" ")}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -121,11 +730,54 @@
     return list;
   }
 
+  function dishMatchesVibe(dish, group) {
+    const d = dish.toLowerCase();
+    if (group && d.includes(group.toLowerCase())) return true;
+    const kws = DISH_VIBES[group] || [];
+    return kws.some((k) => d.includes(k) || (d.length >= 4 && k.includes(d)));
+  }
+
+  function googleRatingOf(r) {
+    if (typeof r.googleRating === "number") return r.googleRating;
+    return null;
+  }
+
+  function suggestionScore(r, cuisineGroup) {
+    const n = getNotes(r.id);
+    let score = 0;
+    if (n.rating) score += n.rating * 3;
+    const g = googleRatingOf(r);
+    if (g != null) score += g * 1.5;
+    if (n.dishes.length) {
+      if (cuisineGroup) {
+        const hits = n.dishes.filter((d) => dishMatchesVibe(d, cuisineGroup));
+        if (hits.length) score += 2 + hits.length * 1.5;
+        else score += 0.4;
+      } else {
+        score += Math.min(2, n.dishes.length * 0.4);
+      }
+    }
+    if (cuisineGroup && cuisineGroupsFor(r).includes(cuisineGroup)) score += 2;
+    if ((r.tags || []).includes("highly_rated")) score += 0.35;
+    return score;
+  }
+
+  function starButtons(rating, name) {
+    let html = `<div class="stars" role="group" aria-label="Your rating for ${escapeAttr(name)}">`;
+    for (let i = 1; i <= 5; i += 1) {
+      const on = rating >= i;
+      html += `<button type="button" class="star${on ? " is-on" : ""}" data-rating="${i}" aria-label="${i} star${i === 1 ? "" : "s"}" aria-pressed="${on ? "true" : "false"}">★</button>`;
+    }
+    html += `<span class="star-caption">${rating ? `${rating}/5` : "Rate it"}</span></div>`;
+    return html;
+  }
+
   function renderCard(r) {
     const li = document.createElement("li");
-    li.className = "card" + (visited.has(r.id) ? " is-visited" : "");
+    li.className = "card" + (visited.has(r.id) ? " is-visited" : "") + (isCustom(r) ? " is-custom" : "");
     li.dataset.id = r.id;
 
+    const n = getNotes(r.id);
     const tagsHtml = (r.tags || [])
       .map((t) => `<li class="tag">${escapeHtml(humanTag(t))}</li>`)
       .join("");
@@ -138,22 +790,47 @@
       distanceHtml = `<p class="distance">Location unknown</p>`;
     }
 
-    const sources = Array.isArray(r.sources) ? r.sources : [];
-    const linksHtml =
-      sources.length > 0
-        ? `<p class="card-links">${sources
-            .slice(0, 2)
-            .map((url, i) => {
-              let label = "Source";
-              try {
-                label = new URL(url).hostname.replace(/^www\./, "");
-              } catch {
-                /* keep */
-              }
-              return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}${i === 0 && sources.length > 1 ? "" : ""}</a>`;
-            })
-            .join(" · ")}</p>`
+    const mapsUrl = mapsSearchUrl(r);
+    const actionsHtml = `<div class="place-actions" role="group" aria-label="Open ${escapeAttr(r.name)}">
+      ${placeActionLinks(r)
+        .map(
+          (link) =>
+            `<a class="place-action${link.search ? " is-search" : ""}" href="${escapeAttr(link.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`
+        )
+        .join("")}
+    </div>`;
+
+    const hood = neighbourhood(r.area);
+    const areaLabel = r.area && hood !== r.area ? `${hood} · ${r.area}` : r.area || hood;
+    const g = googleRatingOf(r);
+    const googleHtml =
+      g != null
+        ? `<span class="google-pill" title="Optional rating you saved (not a live Google score)">Google ${escapeHtml(String(g))}</span>`
         : "";
+    const customBadge = isCustom(r) ? `<span class="you-badge">Your add</span>` : "";
+
+    const dishesHtml = n.dishes.length
+      ? n.dishes
+          .map(
+            (d) =>
+              `<li class="dish-chip"><span>${escapeHtml(d)}</span><button type="button" class="dish-remove" data-dish="${escapeAttr(d)}" aria-label="Remove ${escapeAttr(d)}">×</button></li>`
+          )
+          .join("")
+      : `<li class="dish-empty">None yet</li>`;
+
+    const customEditor = isCustom(r)
+      ? `<div class="custom-edit">
+          <label class="mini-field">Area
+            <input class="edit-area" value="${escapeAttr(r.area || "")}" placeholder="RS Puram" list="area-suggestions" />
+          </label>
+          <label class="mini-field">Cuisine
+            <input class="edit-cuisine" value="${escapeAttr(r.cuisine || "")}" placeholder="South Indian" list="cuisine-suggestions" />
+          </label>
+          <label class="mini-field mini-narrow">Google ★
+            <input class="edit-google" type="number" min="0" max="5" step="0.1" value="${g != null ? escapeAttr(String(g)) : ""}" placeholder="—" />
+          </label>
+        </div>`
+      : "";
 
     li.innerHTML = `
       <label class="visit-toggle" title="Mark as visited">
@@ -163,29 +840,104 @@
       </label>
       <div class="card-body">
         <div class="card-top">
-          <h2 class="card-name">${escapeHtml(r.name)}</h2>
+          <h2 class="card-name">
+            <a class="card-name-link" href="${escapeAttr(mapsUrl)}" target="_blank" rel="noopener noreferrer" title="Open in Google Maps">${escapeHtml(r.name)}</a>
+          </h2>
           <span class="price">${escapeHtml(r.price || "")}</span>
+          ${customBadge}
+          ${googleHtml}
         </div>
         <p class="card-meta">
-          <span>${escapeHtml(r.area)}</span>
+          <span>${escapeHtml(areaLabel)}</span>
           <span class="sep">·</span>
-          <span>${escapeHtml(r.cuisine)}</span>
+          <span>${escapeHtml(r.cuisine || "Cuisine not set")}</span>
         </p>
-        <p class="blurb">${escapeHtml(r.blurb || "")}</p>
+        ${r.blurb ? `<p class="blurb">${escapeHtml(r.blurb)}</p>` : ""}
         <ul class="tags">${tagsHtml}</ul>
         ${distanceHtml}
-        ${linksHtml}
+        ${actionsHtml}
+        <div class="personal">
+          <p class="personal-label">Your rating</p>
+          ${starButtons(n.rating, r.name)}
+          <p class="personal-label">Liked dishes</p>
+          <ul class="dish-list">${dishesHtml}</ul>
+          <form class="dish-form">
+            <input class="dish-input" type="text" maxlength="60" placeholder="Add a dish you like…" aria-label="Add liked dish for ${escapeAttr(r.name)}" />
+            <button type="submit" class="btn btn-ghost btn-tiny">Add</button>
+          </form>
+          ${customEditor}
+          <div class="card-actions">
+            <button type="button" class="btn btn-ghost btn-tiny btn-remove-place">Remove from my list</button>
+          </div>
+        </div>
       </div>
     `;
 
-    const cb = li.querySelector(".visit-cb");
-    cb.addEventListener("change", () => {
-      if (cb.checked) visited.add(r.id);
+    li.querySelector(".visit-cb").addEventListener("change", (e) => {
+      if (e.target.checked) visited.add(r.id);
       else visited.delete(r.id);
-      saveVisited();
+      saveState();
       updateStats();
       renderList();
     });
+
+    li.querySelectorAll(".star").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const value = Number(btn.dataset.rating);
+        const current = getNotes(r.id);
+        const nextRating = current.rating === value ? null : value;
+        putNotes(r.id, { ...current, rating: nextRating });
+        updateStats();
+        renderList();
+      });
+    });
+
+    const dishForm = li.querySelector(".dish-form");
+    dishForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = dishForm.querySelector(".dish-input");
+      const dish = input.value.trim();
+      if (!dish) return;
+      const current = getNotes(r.id);
+      if (current.dishes.some((d) => d.toLowerCase() === dish.toLowerCase())) {
+        input.value = "";
+        return;
+      }
+      putNotes(r.id, { ...current, dishes: [...current.dishes, dish] });
+      renderList();
+    });
+
+    li.querySelectorAll(".dish-remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dish = btn.dataset.dish;
+        const current = getNotes(r.id);
+        putNotes(r.id, {
+          ...current,
+          dishes: current.dishes.filter((d) => d !== dish),
+        });
+        renderList();
+      });
+    });
+
+    if (isCustom(r)) {
+      const persistCustomEdits = () => {
+        const place = customPlaces.find((p) => p.id === r.id);
+        if (!place) return;
+        place.area = li.querySelector(".edit-area").value.trim();
+        place.cuisine = li.querySelector(".edit-cuisine").value.trim();
+        place.googleRating = parseGoogleRating(li.querySelector(".edit-google").value);
+        saveState();
+        rebuildRestaurants();
+        refreshFilterOptions();
+        updateStats();
+        renderList();
+      };
+      li.querySelector(".edit-area").addEventListener("change", persistCustomEdits);
+      li.querySelector(".edit-cuisine").addEventListener("change", persistCustomEdits);
+      li.querySelector(".edit-google").addEventListener("change", persistCustomEdits);
+    }
+
+    li.querySelector(".btn-remove-place").addEventListener("click", () => removePlace(r));
 
     return li;
   }
@@ -203,6 +955,7 @@
   }
 
   function renderList() {
+    const scrollY = window.scrollY;
     const filtered = getFiltered();
     listEl.innerHTML = "";
     if (filtered.length === 0) {
@@ -211,39 +964,98 @@
     } else {
       emptyEl.hidden = true;
       const frag = document.createDocumentFragment();
-      for (const r of filtered) frag.appendChild(renderCard(r));
+      const groupByArea = !sortByDistance && !areaFilter;
+      if (groupByArea) {
+        const groups = new Map();
+        for (const r of filtered) {
+          const key = neighbourhood(r.area);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(r);
+        }
+        const keys = [...groups.keys()].sort((a, b) => {
+          if (a === "Unspecified") return 1;
+          if (b === "Unspecified") return -1;
+          return a.localeCompare(b);
+        });
+        for (const key of keys) {
+          const head = document.createElement("li");
+          head.className = "area-heading";
+          const items = groups.get(key);
+          head.innerHTML = `<h2>${escapeHtml(key)}</h2><span>${items.length}</span>`;
+          frag.appendChild(head);
+          for (const r of items) frag.appendChild(renderCard(r));
+        }
+      } else {
+        for (const r of filtered) frag.appendChild(renderCard(r));
+      }
       listEl.appendChild(frag);
       let meta = `Showing ${filtered.length} of ${restaurants.length}`;
+      if (customPlaces.length) meta += ` · ${customPlaces.length} added by you`;
       if (sortByDistance && userCoords) meta += " · sorted by distance";
+      else if (groupByArea) meta += " · grouped by area";
+      if (cuisineFilter) meta += ` · ${cuisineFilter}`;
       listMeta.textContent = meta;
     }
+    window.scrollTo(0, scrollY);
   }
 
   function pickSuggestions() {
-    const untried = restaurants.filter((r) => !visited.has(r.id));
-    if (untried.length === 0) {
+    const cuisineGroup = cuisineFilter || "";
+    let pool = restaurants.filter((r) => !visited.has(r.id));
+    if (areaFilter) pool = pool.filter((r) => neighbourhood(r.area) === areaFilter);
+    if (cuisineGroup) pool = pool.filter((r) => cuisineGroupsFor(r).includes(cuisineGroup));
+
+    if (pool.length === 0) {
+      const label = [cuisineGroup, areaFilter].filter(Boolean).join(" · ");
       suggestTitle.textContent = "You're caught up!";
-      suggestList.innerHTML =
-        '<p class="suggest-reason">Every place on the list is marked visited. Uncheck a few — or import a leaner backup — to get fresh picks.</p>';
+      suggestList.innerHTML = `<p class="suggest-reason">${
+        label
+          ? escapeHtml(`No untried ${label} places left. Clear a filter or uncheck a visit to get fresh picks.`)
+          : "Every place on the list is marked visited. Uncheck a few — or import a leaner backup — to get fresh picks."
+      }</p>`;
       suggestPanel.hidden = false;
       return;
     }
 
-    const count = Math.min(3, untried.length);
-    const shuffled = [...untried].sort(() => Math.random() - 0.5);
-    const picks = shuffled.slice(0, count);
+    const ranked = [...pool].sort((a, b) => {
+      const diff = suggestionScore(b, cuisineGroup) - suggestionScore(a, cuisineGroup);
+      if (Math.abs(diff) > 0.05) return diff;
+      return Math.random() - 0.5;
+    });
+    const shortlist = ranked.slice(0, Math.min(8, ranked.length));
+    const shuffledHead = [...shortlist].sort((a, b) => {
+      const diff = suggestionScore(b, cuisineGroup) - suggestionScore(a, cuisineGroup);
+      if (Math.abs(diff) > 1.2) return diff;
+      return Math.random() - 0.5;
+    });
+    const count = Math.min(3, shuffledHead.length);
+    const picks = shuffledHead.slice(0, count);
 
+    const titleBits = [];
+    if (cuisineGroup) titleBits.push(cuisineGroup);
+    if (areaFilter) titleBits.push(areaFilter);
     suggestTitle.textContent =
-      count === 1 ? "Tonight’s pick" : `${count} ideas for you`;
+      count === 1
+        ? titleBits.length
+          ? `${titleBits.join(" · ")} pick`
+          : "Tonight’s pick"
+        : titleBits.length
+          ? `${count} ${titleBits.join(" · ")} ideas`
+          : `${count} ideas for you`;
     suggestList.innerHTML = "";
 
     for (const r of picks) {
-      const reason = suggestionReason(r, untried);
+      const reason = suggestionReason(r, pool, cuisineGroup);
+      const n = getNotes(r.id);
+      const g = googleRatingOf(r);
+      const extras = [];
+      if (n.rating) extras.push(`your ${n.rating}/5`);
+      if (g != null) extras.push(`saved Google ${g}`);
       const card = document.createElement("div");
       card.className = "suggest-card";
       card.innerHTML = `
         <h3>${escapeHtml(r.name)}</h3>
-        <p class="suggest-meta">${escapeHtml(r.area)} · ${escapeHtml(r.cuisine)} · ${escapeHtml(r.price || "")}</p>
+        <p class="suggest-meta">${escapeHtml(neighbourhood(r.area))} · ${escapeHtml(r.cuisine || "Cuisine not set")}${r.price ? ` · ${escapeHtml(r.price)}` : ""}${extras.length ? ` · ${escapeHtml(extras.join(" · "))}` : ""}</p>
         <p class="suggest-reason">${escapeHtml(reason)}</p>
       `;
       suggestList.appendChild(card);
@@ -252,35 +1064,52 @@
     suggestPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  function suggestionReason(r, pool) {
-    const tags = r.tags || [];
+  function suggestionReason(r, pool, cuisineGroup) {
+    const n = getNotes(r.id);
     const parts = [];
+    const tags = r.tags || [];
+
+    if (cuisineGroup && cuisineGroupsFor(r).includes(cuisineGroup)) {
+      parts.push(`fits your ${cuisineGroup} filter`);
+    }
+
+    if (n.rating) parts.push(`you already rated it ${n.rating}/5`);
+    const g = googleRatingOf(r);
+    if (g != null) parts.push(`saved Google score ${g}`);
+
+    if (cuisineGroup && n.dishes.length) {
+      const hits = n.dishes.filter((d) => dishMatchesVibe(d, cuisineGroup));
+      if (hits.length) {
+        parts.push(`liked dishes that feel ${cuisineGroup}: ${hits.slice(0, 3).join(", ")}`);
+      }
+    } else if (n.dishes.length) {
+      parts.push(`you noted ${n.dishes.slice(0, 2).join(", ")}`);
+    }
+
     if (tags.includes("fine_dining")) parts.push("a special-occasion fine dining stop");
     else if (tags.includes("vegetarian")) parts.push("a solid vegetarian-forward pick");
     else if (tags.includes("bar")) parts.push("good for drinks and small plates");
     else if (tags.includes("hotel")) parts.push("reliable hotel dining");
     else if (tags.includes("highly_rated")) parts.push("frequently recommended around town");
+    else if (isCustom(r)) parts.push("from your personal list");
 
     if (r.price && r.price.length <= 2) parts.push("easy on the wallet");
     else if (r.price && r.price.length >= 4) parts.push("worth dressing up a bit");
 
-    const areaCount = pool.filter((x) => x.area === r.area).length;
-    if (areaCount === 1) parts.push(`the only untried spot left in ${r.area}`);
-    else parts.push(`untried in ${r.area}`);
+    const areaCount = pool.filter((x) => neighbourhood(x.area) === neighbourhood(r.area)).length;
+    if (areaCount === 1) parts.push(`the only untried spot left in ${neighbourhood(r.area)}`);
+    else parts.push(`untried in ${neighbourhood(r.area)}`);
 
-    if (parts.length === 0) return `Random untried pick — ${r.cuisine}.`;
+    if (parts.length === 0) return `Random untried pick — ${r.cuisine || "your list"}.`;
     const lead = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
     return `${lead}${parts.length > 1 ? " · " + parts.slice(1).join(" · ") : ""}.`;
   }
 
   function requestNearby() {
-    geoStatus.classList.remove("is-error");
-    geoStatus.textContent = "Requesting location…";
+    setStatus("Requesting location…");
 
     if (!navigator.geolocation) {
-      geoStatus.classList.add("is-error");
-      geoStatus.textContent =
-        "Geolocation isn’t available in this browser. Sorting skipped — list unchanged.";
+      setStatus("Geolocation isn’t available in this browser. Sorting skipped — list unchanged.", true);
       return;
     }
 
@@ -301,31 +1130,36 @@
         const without = restaurants.filter(
           (r) => !visited.has(r.id) && !hasCoords(r)
         ).length;
-        geoStatus.textContent = `Location on · ${withCoords} untried with coords sorted nearest-first${
-          without ? `; ${without} without coords listed last` : ""
-        }.`;
+        setStatus(
+          `Location on · ${withCoords} untried with coords sorted nearest-first${
+            without ? `; ${without} without coords listed last` : ""
+          }.`
+        );
         renderList();
       },
       (err) => {
         sortByDistance = false;
         userCoords = null;
-        geoStatus.classList.add("is-error");
         const msg =
           err && err.code === 1
             ? "Location permission denied — nearby sort skipped. You can still browse and filter normally."
             : "Couldn’t get location — nearby sort skipped. Browse and filter as usual.";
-        geoStatus.textContent = msg;
+        setStatus(msg, true);
         renderList();
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
     );
   }
 
-  function exportVisited() {
+  function exportState() {
     const payload = {
+      version: 2,
       exportedAt: new Date().toISOString(),
       city: "Coimbatore",
       visited: [...visited],
+      notes,
+      customPlaces,
+      hiddenIds: [...hiddenIds],
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -333,33 +1167,1126 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "coimbatore-visited.json";
+    a.download = "coimbatore-picker.json";
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function importVisited(file) {
+  function importState(file) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result));
-        let ids = [];
-        if (Array.isArray(data)) ids = data;
-        else if (data && Array.isArray(data.visited)) ids = data.visited;
-        else throw new Error("Expected { visited: string[] } or a string array");
-        const valid = new Set(restaurants.map((r) => r.id));
-        visited = new Set(ids.filter((id) => typeof id === "string" && valid.has(id)));
-        saveVisited();
+        const ids = readVisitedList(data);
+        if (!ids) {
+          throw new Error("Expected a v2 backup or { visited: string[] }");
+        }
+        visited = new Set(ids);
+        const isV2 =
+          data &&
+          typeof data === "object" &&
+          !Array.isArray(data) &&
+          (data.version === 2 || "notes" in data || "customPlaces" in data || "hiddenIds" in data);
+        if (isV2) {
+          notes = readNotesMap(data.notes);
+          customPlaces = readCustomList(data.customPlaces);
+          hiddenIds = new Set([
+            ...readIdList(data.hiddenIds),
+            ...readIdList(data.removedIds),
+          ]);
+        }
+        rebuildRestaurants();
+        const validIds = new Set([
+          ...restaurants.map((r) => r.id),
+          ...hiddenIds,
+          ...curated.map((r) => r.id),
+        ]);
+        visited = new Set([...visited].filter((id) => validIds.has(id)));
+        saveState();
+        refreshFilterOptions();
         updateStats();
         renderList();
-        geoStatus.classList.remove("is-error");
-        geoStatus.textContent = `Imported ${visited.size} visited place(s).`;
+        setStatus(
+          `Imported ${visited.size} visited, ${Object.keys(notes).length} with notes, ${customPlaces.length} custom place(s).`
+        );
       } catch (e) {
-        geoStatus.classList.add("is-error");
-        geoStatus.textContent = `Import failed: ${e.message || "invalid JSON"}`;
+        setStatus(`Import failed: ${e.message || "invalid JSON"}`, true);
       }
     };
     reader.readAsText(file);
+  }
+
+  function nameKey(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/['’]/g, "")
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function tokensOf(value) {
+    return nameKey(value)
+      .split(/\s+/)
+      .filter((t) => t.length >= 2);
+  }
+
+  function tokenCovered(queryToken, nameTokens) {
+    return nameTokens.some((nt) => {
+      if (nt === queryToken) return true;
+      if (queryToken.length >= 4 && nt.startsWith(queryToken)) return true;
+      return false;
+    });
+  }
+
+  /** Every meaningful query token must appear in the name (asian+stories ≠ amutha/nalan stores). */
+  function hasStrongTokenOverlap(query, name) {
+    const qTokens = tokensOf(query).filter((t) => t.length >= 3);
+    const nTokens = tokensOf(name);
+    if (!qTokens.length || !nTokens.length) return false;
+    return qTokens.every((qt) => tokenCovered(qt, nTokens));
+  }
+
+  function nameMatchScore(query, name) {
+    const q = nameKey(query);
+    const n = nameKey(name);
+    if (!q || !n) return 0;
+    if (n === q) return 100;
+    if (n.startsWith(q) || n.includes(` ${q}`)) return 90;
+    if (n.includes(q) && q.length >= 4) return 80;
+    const qTokens = tokensOf(query);
+    if (!qTokens.length) return 0;
+    const nTokens = tokensOf(name);
+    const hits = qTokens.filter((t) => tokenCovered(t, nTokens));
+    if (hits.length === qTokens.length) return 75;
+    return 0;
+  }
+
+  function inCoimbatore(lat, lng, haystack) {
+    const text = String(haystack || "").toLowerCase();
+    if (/coimbatore|kovai|கோயம்புத்தூர்/.test(text)) return true;
+    if (typeof lat !== "number" || typeof lng !== "number") return /tamil\s*nadu/.test(text);
+    return haversineKm(CBE_CENTER, { lat, lng }) <= CBE_RADIUS_KM;
+  }
+
+  function humanPlaceType(raw) {
+    const t = String(raw || "").toLowerCase().replace(/_/g, " ");
+    if (!t) return "";
+    if (/south indian/.test(t)) return "South Indian restaurant";
+    if (/north indian/.test(t)) return "North Indian restaurant";
+    if (/italian/.test(t)) return "Italian restaurant";
+    if (t === "cafe" || t === "coffee shop") return "Café";
+    if (t === "bar" || t === "pub" || t === "night club") return "Bar";
+    if (t === "bakery") return "Bakery";
+    if (t === "fast food" || t === "meal takeaway") return "Fast food";
+    if (t === "restaurant") return "Restaurant";
+    if (t === "food court") return "Food court";
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function cuisineFromType(type, extraCuisine) {
+    const mapped = (value) => {
+      const t = String(value || "")
+        .toLowerCase()
+        .replace(/_/g, " ")
+        .trim();
+      if (!t) return "";
+      if (/south indian/.test(t)) return "South Indian";
+      if (/north indian/.test(t)) return "North Indian";
+      if (/italian/.test(t)) return "Italian";
+      if (/chinese|thai|japanese|korean|asian/.test(t)) return "Asian";
+      if (t === "cafe" || t === "coffee shop") return "Café";
+      if (t === "bar" || t === "pub" || t === "night club") return "Bar & pub";
+      if (t === "bakery") return "Bakery";
+      if (t === "fast food" || t === "meal takeaway") return "Fast food";
+      if (t === "restaurant" || t === "yes" || t === "amenity") return "";
+      return "";
+    };
+    const fromType = mapped(type);
+    if (extraCuisine) {
+      const extraMapped = mapped(extraCuisine);
+      if (extraMapped) return extraMapped;
+      const bits = String(extraCuisine)
+        .split(/[;,/]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.replace(/_/g, " "))
+        .filter((s) => !mapped(s) && !/^(cafe|coffee shop|restaurant|bar|pub|yes)$/i.test(s));
+      if (bits.length) return bits.join(" / ");
+    }
+    return fromType;
+  }
+
+  function areaFromAddressParts(parts) {
+    const keys = [
+      "suburb",
+      "neighbourhood",
+      "neighborhood",
+      "city_district",
+      "quarter",
+      "village",
+      "town",
+      "county",
+      "road",
+    ];
+    for (const key of keys) {
+      if (parts && parts[key]) {
+        const hood = neighbourhood(parts[key]);
+        if (hood && hood !== "Unspecified") return hood === parts[key] ? parts[key] : hood;
+      }
+    }
+    if (parts && parts.city && /coimbatore/i.test(parts.city)) return parts.suburb || parts.city;
+    return (parts && (parts.suburb || parts.city)) || "";
+  }
+
+  function areaFromGoogleComponents(components) {
+    if (!Array.isArray(components)) return "";
+    const byType = (type) => {
+      const hit = components.find((c) => Array.isArray(c.types) && c.types.includes(type));
+      return hit && (hit.longText || hit.shortText || "");
+    };
+    return (
+      byType("sublocality_level_1") ||
+      byType("sublocality") ||
+      byType("neighborhood") ||
+      byType("administrative_area_level_3") ||
+      byType("locality") ||
+      ""
+    );
+  }
+
+  function findExistingPlace(partial) {
+    if (partial && partial.external && partial.external.id) {
+      const byExt = restaurants.find(
+        (r) =>
+          r.external &&
+          r.external.provider === partial.external.provider &&
+          r.external.id === partial.external.id
+      );
+      if (byExt) return byExt;
+    }
+    const key = nameKey(partial && partial.name);
+    if (!key) return null;
+    return restaurants.find((r) => nameKey(r.name) === key) || null;
+  }
+
+  function jumpToPlace(r, message) {
+    searchInput.value = r.name;
+    searchQuery = r.name;
+    hidePlaceSuggest();
+    renderList();
+    requestAnimationFrame(() => {
+      document.querySelector(`.card[data-id="${CSS.escape(r.id)}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    setStatus(message || `${r.name} is already on your list — jumped to it.`);
+  }
+
+  function commitCustomPlace(partial, { confirmDuplicate = true } = {}) {
+    const existing = findExistingPlace(partial);
+    if (existing) {
+      if (!confirmDuplicate) {
+        jumpToPlace(existing);
+        return existing;
+      }
+      const again = window.confirm(
+        `“${existing.name}” is already on the list. Add another copy anyway?`
+      );
+      if (!again) {
+        jumpToPlace(existing);
+        return existing;
+      }
+    }
+    const place = normalizeCustomPlace({
+      id: newCustomId(partial.name),
+      name: partial.name,
+      area: partial.area || "",
+      cuisine: partial.cuisine || "",
+      googleRating: partial.googleRating,
+      lat: partial.lat,
+      lng: partial.lng,
+      sources: partial.sources || [],
+      tags: partial.tags || ["added_by_you"],
+      external: partial.external || null,
+      custom: true,
+      createdAt: new Date().toISOString(),
+    });
+    if (!place) return null;
+    customPlaces.push(place);
+    saveState();
+    rebuildRestaurants();
+    refreshFilterOptions();
+    updateStats();
+    addForm.reset();
+    searchInput.value = "";
+    searchQuery = "";
+    hidePlaceSuggest();
+    renderList();
+    requestAnimationFrame(() => {
+      document.querySelector(`.card[data-id="${CSS.escape(place.id)}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    setStatus(`Added ${place.name} to your list.`);
+    return place;
+  }
+
+  function localPlaceSuggestions(query) {
+    return restaurants
+      .filter((r) => nameMatchScore(query, r.name) >= 70)
+      .slice(0, 5)
+      .map((r) => ({
+        kind: "local",
+        restaurant: r,
+        name: r.name,
+        area: neighbourhood(r.area) || r.area,
+        typeLabel: r.cuisine || "On your list",
+        providerLabel: "Already on your list",
+      }));
+  }
+
+  function seedPlaceSuggestions(query) {
+    return autocompleteSeed
+      .filter((p) => {
+        const names = [p.name, ...(Array.isArray(p.aliases) ? p.aliases : [])];
+        return names.some((nm) => nameMatchScore(query, nm) >= 70);
+      })
+      .filter((p) => !findExistingPlace({ name: p.name, external: { provider: "seed", id: p.id } }))
+      .slice(0, 5)
+      .map((p) => ({
+        kind: "seed",
+        provider: "seed",
+        name: p.name,
+        area: p.area || "",
+        address: p.address || "",
+        typeLabel: p.type || p.cuisine || "Restaurant",
+        cuisine: p.cuisine || "",
+        lat: typeof p.lat === "number" ? p.lat : null,
+        lng: typeof p.lng === "number" ? p.lng : null,
+        sources: Array.isArray(p.sources) ? p.sources : [],
+        providerLabel: "Verified",
+        external: { provider: "seed", id: p.id },
+      }));
+  }
+
+  function customAddItem(query) {
+    return {
+      kind: "custom",
+      name: query,
+      area: addArea.value.trim(),
+      cuisine: addCuisine.value.trim(),
+      typeLabel: "Custom place",
+      providerLabel: "Add as typed",
+    };
+  }
+
+  function suggestProviderHint() {
+    if (settings.mapboxAccessToken && !mapboxSessionError) return "Mapbox Search · Coimbatore";
+    if (settings.mapboxAccessToken && mapboxSessionError) {
+      return `Mapbox failed (${mapboxSessionError}) — using seed + OSM`;
+    }
+    if (hasGoogleKey()) return "Google Places · Coimbatore";
+    return "OSM coverage is patchy — add a Mapbox token for better matches";
+  }
+
+  function hidePlaceSuggest() {
+    suggestItems = [];
+    suggestActive = -1;
+    suggestQuery = "";
+    if (suggestAbort) {
+      suggestAbort.abort();
+      suggestAbort = null;
+    }
+    placeSuggestList.hidden = true;
+    placeSuggestList.innerHTML = "";
+    addName.setAttribute("aria-expanded", "false");
+    placeSuggestLive.textContent = "";
+  }
+
+  function renderPlaceSuggest(items, { loading, providerHint, query } = {}) {
+    const typed = (query || suggestQuery || addName.value).trim();
+    const rowsItems = [...items]
+      .filter((item) => item && item.kind !== "custom")
+      .sort((a, b) => suggestionPriority(a) - suggestionPriority(b));
+    if (typed.length >= 2) {
+      rowsItems.push(customAddItem(typed));
+    }
+    suggestItems = rowsItems;
+    if (suggestActive >= rowsItems.length) suggestActive = rowsItems.length - 1;
+
+    const head = `<li class="place-suggest-head" role="presentation">Is this the place?</li>`;
+    const rows = rowsItems
+      .map((item, i) => {
+        let badge = "";
+        if (item.kind === "local") badge = `<span class="place-suggest-badge">On your list</span>`;
+        else if (item.kind === "seed") badge = `<span class="place-suggest-badge is-verified">Verified</span>`;
+        else if (item.provider === "mapbox") badge = `<span class="place-suggest-badge is-mapbox">Mapbox</span>`;
+        const title =
+          item.kind === "custom"
+            ? `Add “${item.name}” as a custom place`
+            : item.name;
+        const meta =
+          item.kind === "custom"
+            ? "Use the name you typed — area and cuisine optional"
+            : [item.area, item.typeLabel, item.providerLabel]
+                .filter(Boolean)
+                .join(" · ");
+        const extraClass = item.kind === "custom" ? " is-custom-add" : "";
+        return `<li role="presentation">
+          <button type="button" class="place-suggest-item${extraClass}${i === suggestActive ? " is-active" : ""}" role="option" id="place-opt-${i}" data-index="${i}" aria-selected="${i === suggestActive ? "true" : "false"}">
+            <span class="place-suggest-name">${escapeHtml(title)} ${badge}</span>
+            <span class="place-suggest-meta">${escapeHtml(meta)}</span>
+          </button>
+        </li>`;
+      })
+      .join("");
+    const footBits = [];
+    if (loading) footBits.push("Searching Coimbatore…");
+    if (providerHint) footBits.push(providerHint);
+    const cta = !hasMapboxToken() && !hasGoogleKey()
+      ? `<button type="button" class="place-suggest-cta" id="suggest-open-key">Add a Mapbox token</button>`
+      : "";
+    const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" · "))}${cta}</li>`;
+    placeSuggestList.innerHTML = head + rows + foot;
+    placeSuggestList.hidden = false;
+    addName.setAttribute("aria-expanded", "true");
+    placeSuggestLive.textContent = loading
+      ? "Searching places"
+      : `${rowsItems.length} suggestion${rowsItems.length === 1 ? "" : "s"}`;
+    placeSuggestList.querySelectorAll(".place-suggest-item").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.index);
+        if (suggestItems[idx]) choosePlaceSuggestion(suggestItems[idx]);
+      });
+    });
+    const ctaBtn = $("#suggest-open-key");
+    if (ctaBtn) {
+      ctaBtn.addEventListener("mousedown", (e) => e.preventDefault());
+      ctaBtn.addEventListener("click", () => {
+        openPlacesSettings(mapboxTokenInput);
+      });
+    }
+  }
+
+  function suggestionPriority(item) {
+    if (!item) return 9;
+    if (item.kind === "local") return 0;
+    if (item.kind === "remote" && item.provider === "mapbox" && (item.matchScore || 0) >= 70) {
+      return 1;
+    }
+    if (item.kind === "seed") return 2;
+    if (item.kind === "remote" && item.provider === "mapbox") return 3;
+    if (item.kind === "remote" && item.provider === "google") return 4;
+    if (item.kind === "remote") return 5;
+    if (item.kind === "custom") return 6;
+    return 7;
+  }
+
+  /** Local, strong Mapbox POIs, verified seed, other Mapbox, Google, then OSM. */
+  function mergeSuggestionLists(local, seed, remote) {
+    const combined = [...(local || []), ...(seed || []), ...(remote || [])].sort(
+      (a, b) => suggestionPriority(a) - suggestionPriority(b)
+    );
+    const seen = new Set();
+    const out = [];
+    for (const item of combined) {
+      const key = nameKey(item.name);
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      out.push(item);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  function osmTypeBlob(item) {
+    return [item.osmKey, item.osmValue, item.typeLabel, item.extra, item.category, item.name]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .replace(/_/g, " ");
+  }
+
+  function isFoodishOsm(item) {
+    const blob = osmTypeBlob(item);
+    return /\b(restaurant|cafe|café|bar|pub|bakery|bistro|food court|fast food|ice cream|meal|kitchen|mess|dhaba)\b/.test(
+      blob
+    );
+  }
+
+  function isShopOrStore(item) {
+    const blob = osmTypeBlob(item);
+    if (String(item.osmKey || "").toLowerCase() === "shop") return true;
+    if (
+      /\b(supermarket|convenience|department store|grocery|greengrocer|mall|kiosk|clothes|hardware|electronics|general store)\b/.test(
+        blob
+      )
+    ) {
+      return true;
+    }
+    return /\bstores?\b/.test(String(item.name || "").toLowerCase());
+  }
+
+  function isJunkOsm(item) {
+    const blob = osmTypeBlob(item);
+    return /\b(supermarket|convenience|clothes|school|college|university|bank|hospital|parking|fuel|temple|place of worship|residential|hardware|electronics)\b/.test(
+      blob
+    );
+  }
+
+  function keepOsmSuggestion(item, query) {
+    if (!item || !item.name) return false;
+    if (!hasStrongTokenOverlap(query, item.name)) return false;
+    const strongName = nameMatchScore(query, item.name) >= 90;
+    if (isShopOrStore(item) && !strongName) return false;
+    if (isJunkOsm(item) && !strongName) return false;
+    if (isFoodishOsm(item)) return true;
+    return nameMatchScore(query, item.name) >= 80;
+  }
+
+  function newUuid() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  function ensureMapboxSession() {
+    if (!mapboxSessionId) mapboxSessionId = newUuid();
+    return mapboxSessionId;
+  }
+
+  function rotateMapboxSession() {
+    mapboxSessionId = newUuid();
+  }
+
+  function ctxName(ctx, key) {
+    return (ctx && ctx[key] && ctx[key].name) || "";
+  }
+
+  function areaFromMapboxContext(ctx, placeFormatted) {
+    const candidate =
+      ctxName(ctx, "neighborhood") ||
+      ctxName(ctx, "locality") ||
+      ctxName(ctx, "district") ||
+      ctxName(ctx, "place") ||
+      String(placeFormatted || "").split(",")[0];
+    if (!candidate) return "";
+    const hood = neighbourhood(candidate);
+    return hood && hood !== "Unspecified" ? hood : candidate;
+  }
+
+  function mapboxHay(item) {
+    return `${item.name || ""} ${item.area || ""} ${item.address || ""} ${item.typeLabel || ""}`;
+  }
+
+  function isFoodishMapbox(item) {
+    const blob = `${mapboxHay(item)} ${(item.poiCategories || []).join(" ")}`.toLowerCase();
+    return /\b(restaurant|food|cafe|café|coffee|bar|pub|bakery|bistro|diner|eatery|meal|kitchen|fast.food)\b/.test(
+      blob
+    );
+  }
+
+  function isShopishMapbox(item) {
+    const blob = `${mapboxHay(item)} ${(item.poiCategories || []).join(" ")}`.toLowerCase();
+    return /\b(supermarket|convenience|grocery|department.store|shopping|clothes|hardware|electronics|mall)\b/.test(
+      blob
+    ) || /\bstores?\b/.test(String(item.name || "").toLowerCase());
+  }
+
+  function keepMapboxSuggestion(item, query) {
+    if (!item || !item.name) return false;
+    if (item.featureType === "category") return false;
+    if (!hasStrongTokenOverlap(query, item.name)) return false;
+    const hay = mapboxHay(item);
+    if (
+      /bengaluru|bangalore|chennai|hyderabad|mumbai|delhi|pune|kochi|madurai|mysuru|mysore/i.test(hay) &&
+      !/coimbatore|kovai/i.test(hay)
+    ) {
+      return false;
+    }
+    const strongName = nameMatchScore(query, item.name) >= 90;
+    if (isShopishMapbox(item) && !strongName) return false;
+    if (isFoodishMapbox(item) || item.featureType === "poi") return true;
+    return nameMatchScore(query, item.name) >= 80;
+  }
+
+  function mapboxSuggestToItem(row) {
+    const name = row.name_preferred || row.name || "";
+    const cats = Array.isArray(row.poi_category) ? row.poi_category : [];
+    const typeRaw = cats[0] || row.feature_type || "";
+    const placeFormatted = row.place_formatted || row.full_address || "";
+    return {
+      kind: "remote",
+      provider: "mapbox",
+      mapboxId: row.mapbox_id,
+      name,
+      area: areaFromMapboxContext(row.context, placeFormatted),
+      address: row.full_address || placeFormatted || row.address || "",
+      typeLabel: humanPlaceType(typeRaw) || (row.feature_type === "poi" ? "Place" : humanPlaceType(row.feature_type)),
+      cuisine: cuisineFromType(typeRaw, cats.join(",")),
+      poiCategories: cats,
+      featureType: row.feature_type || "",
+      matchScore: nameMatchScore(suggestQuery || name, name),
+      providerLabel: "Mapbox",
+      external: row.mapbox_id ? { provider: "mapbox", id: row.mapbox_id } : null,
+    };
+  }
+
+  function mapboxFeatureToItem(feature) {
+    const props = (feature && feature.properties) || {};
+    const coords = (feature && feature.geometry && feature.geometry.coordinates) || [];
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    const name = props.name_preferred || props.name || "";
+    const cats = Array.isArray(props.poi_category) ? props.poi_category : [];
+    const typeRaw = cats[0] || props.feature_type || "";
+    const placeFormatted = props.place_formatted || props.full_address || "";
+    return {
+      kind: "remote",
+      provider: "mapbox",
+      mapboxId: props.mapbox_id,
+      name,
+      area: areaFromMapboxContext(props.context, placeFormatted),
+      address: props.full_address || placeFormatted || props.address || "",
+      typeLabel: humanPlaceType(typeRaw) || (props.feature_type === "poi" ? "Place" : humanPlaceType(props.feature_type)),
+      cuisine: cuisineFromType(typeRaw, cats.join(",")),
+      poiCategories: cats,
+      featureType: props.feature_type || "",
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      matchScore: nameMatchScore(suggestQuery || name, name),
+      providerLabel: "Mapbox",
+      external: props.mapbox_id ? { provider: "mapbox", id: props.mapbox_id } : null,
+    };
+  }
+
+  function mapboxErrorMessage(data, res) {
+    return (
+      (data && (data.message || data.error_description || data.error)) ||
+      `HTTP ${res.status}`
+    );
+  }
+
+  async function fetchMapboxSearchBox(query, signal) {
+    const params = new URLSearchParams({
+      q: query,
+      access_token: settings.mapboxAccessToken,
+      session_token: ensureMapboxSession(),
+      language: "en",
+      limit: "8",
+      country: "IN",
+      proximity: CBE_PROXIMITY,
+      bbox: CBE_BBOX,
+      types: "poi,address",
+    });
+    const res = await fetch(`https://api.mapbox.com/search/searchbox/v1/suggest?${params}`, {
+      signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(mapboxErrorMessage(data, res));
+    return (data.suggestions || [])
+      .map(mapboxSuggestToItem)
+      .map((item) => ({ ...item, matchScore: nameMatchScore(query, item.name) }))
+      .filter((item) => keepMapboxSuggestion(item, query));
+  }
+
+  async function fetchMapboxGeocode(query, signal) {
+    const params = new URLSearchParams({
+      q: query,
+      access_token: settings.mapboxAccessToken,
+      language: "en",
+      limit: "8",
+      country: "in",
+      proximity: CBE_PROXIMITY,
+      bbox: CBE_BBOX,
+      types: "poi,address",
+    });
+    const res = await fetch(`https://api.mapbox.com/search/geocode/v6/forward?${params}`, {
+      signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(mapboxErrorMessage(data, res));
+    return (data.features || [])
+      .map(mapboxFeatureToItem)
+      .map((item) => ({ ...item, matchScore: nameMatchScore(query, item.name) }))
+      .filter((item) => keepMapboxSuggestion(item, query));
+  }
+
+  async function fetchMapboxSuggestions(query, signal) {
+    try {
+      return await fetchMapboxSearchBox(query, signal);
+    } catch (err) {
+      if (signal && signal.aborted) throw err;
+      const msg = String(err.message || "");
+      if (/401|403|not authorized|invalid token|forbidden/i.test(msg)) throw err;
+      return fetchMapboxGeocode(query, signal);
+    }
+  }
+
+  async function fetchMapboxRetrieve(mapboxId) {
+    const params = new URLSearchParams({
+      access_token: settings.mapboxAccessToken,
+      session_token: ensureMapboxSession(),
+      language: "en",
+    });
+    const res = await fetch(
+      `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${params}`
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(mapboxErrorMessage(data, res));
+    rotateMapboxSession();
+    const feature = (data.features || [])[0];
+    if (!feature) throw new Error("No Mapbox place details");
+    const item = mapboxFeatureToItem(feature);
+    const props = feature.properties || {};
+    const coords = props.coordinates || {};
+    const lat =
+      typeof item.lat === "number"
+        ? item.lat
+        : typeof coords.latitude === "number"
+          ? coords.latitude
+          : null;
+    const lng =
+      typeof item.lng === "number"
+        ? item.lng
+        : typeof coords.longitude === "number"
+          ? coords.longitude
+          : null;
+    return {
+      name: item.name,
+      area: item.area,
+      cuisine: item.cuisine,
+      lat,
+      lng,
+      sources: [],
+      tags: ["added_by_you"],
+      external: item.external,
+    };
+  }
+
+  async function fetchGoogleAutocomplete(query, signal) {
+    const key = settings.googlePlacesApiKey;
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask":
+          "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.types",
+      },
+      body: JSON.stringify({
+        input: query,
+        languageCode: "en",
+        includedRegionCodes: ["in"],
+        locationBias: {
+          circle: {
+            center: { latitude: CBE_CENTER.lat, longitude: CBE_CENTER.lng },
+            radius: 30000,
+          },
+        },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = (data.error && data.error.message) || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return (data.suggestions || [])
+      .map((row) => row.placePrediction)
+      .filter(Boolean)
+      .map((pred) => {
+        const name =
+          (pred.structuredFormat &&
+            pred.structuredFormat.mainText &&
+            pred.structuredFormat.mainText.text) ||
+          (pred.text && pred.text.text) ||
+          "";
+        const secondary =
+          (pred.structuredFormat &&
+            pred.structuredFormat.secondaryText &&
+            pred.structuredFormat.secondaryText.text) ||
+          "";
+        const types = Array.isArray(pred.types) ? pred.types : [];
+        const primary = types.find((t) =>
+          /restaurant|cafe|bar|bakery|food|meal/i.test(t)
+        ) || types[0] || "";
+        return {
+          kind: "remote",
+          provider: "google",
+          placeId: pred.placeId,
+          name,
+          area: secondary.split(",")[0] || secondary,
+          address: secondary,
+          typeLabel: humanPlaceType(primary),
+          cuisine: cuisineFromType(primary),
+          providerLabel: "Google",
+          types,
+        };
+      })
+      .filter((item) => {
+        if (!item.name) return false;
+        const hay = `${item.name} ${item.address}`;
+        if (
+          /bengaluru|bangalore|chennai|hyderabad|mumbai|delhi|pune|kochi|madurai|mysuru|mysore/i.test(
+            hay
+          ) &&
+          !/coimbatore|kovai/i.test(hay)
+        ) {
+          return false;
+        }
+        return true;
+      });
+  }
+
+  async function fetchGooglePlaceDetails(placeId) {
+    const key = settings.googlePlacesApiKey;
+    const res = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+      {
+        headers: {
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask":
+            "id,displayName,formattedAddress,location,types,primaryType,primaryTypeDisplayName,addressComponents,rating,googleMapsUri",
+        },
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.error && data.error.message) || `HTTP ${res.status}`);
+    const name = (data.displayName && data.displayName.text) || "";
+    const types = Array.isArray(data.types) ? data.types : [];
+    const primary = data.primaryType || types[0] || "";
+    const lat =
+      data.location && typeof data.location.latitude === "number"
+        ? data.location.latitude
+        : null;
+    const lng =
+      data.location && typeof data.location.longitude === "number"
+        ? data.location.longitude
+        : null;
+    return {
+      name,
+      area: areaFromGoogleComponents(data.addressComponents) || "",
+      cuisine: cuisineFromType(primary),
+      lat,
+      lng,
+      googleRating: parseGoogleRating(data.rating),
+      sources: data.googleMapsUri ? [data.googleMapsUri] : [],
+      tags: ["added_by_you"],
+      external: { provider: "google", id: data.id || placeId },
+    };
+  }
+
+  function nominatimToItem(row) {
+    const lat = Number(row.lat);
+    const lng = Number(row.lon);
+    const address = row.address || {};
+    const hay = `${row.display_name || ""} ${row.name || ""}`;
+    if (!inCoimbatore(lat, lng, hay)) return null;
+    const type = row.type || row.category || "";
+    const extra = (row.extratags && (row.extratags.cuisine || row.extratags.amenity)) || "";
+    const osmType =
+      row.osm_type === "node" ? "node" : row.osm_type === "way" ? "way" : "relation";
+    return {
+      kind: "remote",
+      provider: "osm",
+      name: row.name || (row.display_name || "").split(",")[0],
+      area: areaFromAddressParts(address),
+      address: row.display_name || "",
+      osmKey: row.category || "",
+      osmValue: row.type || "",
+      typeLabel: humanPlaceType(type),
+      cuisine: cuisineFromType(type, row.extratags && row.extratags.cuisine),
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      providerLabel: "OpenStreetMap",
+      sources: row.osm_id ? [`https://www.openstreetmap.org/${osmType}/${row.osm_id}`] : [],
+      external: row.osm_id
+        ? { provider: "osm", id: `${row.osm_type}:${row.osm_id}` }
+        : null,
+      extra,
+    };
+  }
+
+  function photonToItem(feature) {
+    const props = feature.properties || {};
+    const coords = (feature.geometry && feature.geometry.coordinates) || [];
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    const hay = [props.name, props.city, props.state, props.district, props.locality, props.street]
+      .filter(Boolean)
+      .join(" ");
+    if (!inCoimbatore(lat, lng, hay)) return null;
+    const osmType = props.osm_type === "N" ? "node" : props.osm_type === "W" ? "way" : "relation";
+    return {
+      kind: "remote",
+      provider: "osm",
+      name: props.name || "",
+      area: areaFromAddressParts({
+        suburb: props.locality || props.district,
+        neighbourhood: props.district,
+        road: props.street,
+        city: props.city,
+      }),
+      address: hay,
+      osmKey: props.osm_key || "",
+      osmValue: props.osm_value || props.type || "",
+      typeLabel: humanPlaceType(props.osm_value || props.type),
+      cuisine: cuisineFromType(props.osm_value),
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      providerLabel: "OpenStreetMap",
+      sources: props.osm_id
+        ? [`https://www.openstreetmap.org/${osmType}/${props.osm_id}`]
+        : [],
+      external: props.osm_id
+        ? { provider: "osm", id: `${props.osm_type}:${props.osm_id}` }
+        : null,
+    };
+  }
+
+  async function fetchOsmSuggestions(query, signal) {
+    const q = /coimbatore|kovai/i.test(query) ? query : `${query} Coimbatore`;
+    const nomUrl =
+      "https://nominatim.openstreetmap.org/search?" +
+      new URLSearchParams({
+        q,
+        format: "jsonv2",
+        addressdetails: "1",
+        extratags: "1",
+        limit: "6",
+        countrycodes: "in",
+        viewbox: "76.80,11.22,77.18,10.85",
+        bounded: "0",
+      });
+    const photonUrl =
+      "https://photon.komoot.io/api/?" +
+      new URLSearchParams({
+        q,
+        lat: String(CBE_CENTER.lat),
+        lon: String(CBE_CENTER.lng),
+        limit: "6",
+        lang: "en",
+        bbox: "76.80,10.85,77.18,11.22",
+      });
+    const [nomRes, photonRes] = await Promise.allSettled([
+      fetch(nomUrl, { signal, headers: { Accept: "application/json" } }),
+      fetch(photonUrl, { signal, headers: { Accept: "application/json" } }),
+    ]);
+    const items = [];
+    if (nomRes.status === "fulfilled" && nomRes.value.ok) {
+      const rows = await nomRes.value.json();
+      for (const row of rows) {
+        const item = nominatimToItem(row);
+        if (item && item.name) items.push(item);
+      }
+    }
+    if (photonRes.status === "fulfilled" && photonRes.value.ok) {
+      const data = await photonRes.value.json();
+      for (const feature of data.features || []) {
+        const item = photonToItem(feature);
+        if (item && item.name) items.push(item);
+      }
+    }
+    const seen = new Set();
+    return items.filter((item) => {
+      if (!keepOsmSuggestion(item, query)) return false;
+      const coordKey =
+        typeof item.lat === "number" && typeof item.lng === "number"
+          ? `${item.lat.toFixed(3)},${item.lng.toFixed(3)}`
+          : item.external && item.external.id;
+      const key = `${nameKey(item.name)}|${coordKey || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  async function fetchRemoteSuggestions(query, signal) {
+    if (hasMapboxToken()) {
+      try {
+        const mapboxItems = await fetchMapboxSuggestions(query, signal);
+        mapboxSessionError = "";
+        refreshPlacesProviderStatus();
+        if (mapboxItems.length) return mapboxItems;
+      } catch (err) {
+        if (signal && signal.aborted) throw err;
+        mapboxSessionError = err.message || "request failed";
+        refreshPlacesProviderStatus();
+      }
+    }
+    if (hasGoogleKey()) {
+      try {
+        const googleItems = await fetchGoogleAutocomplete(query, signal);
+        googleSessionError = "";
+        refreshPlacesProviderStatus();
+        return googleItems;
+      } catch (err) {
+        if (signal && signal.aborted) throw err;
+        googleSessionError = err.message || "request failed";
+        refreshPlacesProviderStatus();
+      }
+    }
+    return fetchOsmSuggestions(query, signal);
+  }
+
+  async function runPlaceLookup(query) {
+    const local = localPlaceSuggestions(query);
+    const seed = seedPlaceSuggestions(query);
+    renderPlaceSuggest(mergeSuggestionLists(local, seed), {
+      loading: true,
+      providerHint: suggestProviderHint(),
+      query,
+    });
+    if (suggestAbort) suggestAbort.abort();
+    suggestAbort = new AbortController();
+    const { signal } = suggestAbort;
+    try {
+      const remote = await fetchRemoteSuggestions(query, signal);
+      if (addName.value.trim() !== query) return;
+      renderPlaceSuggest(mergeSuggestionLists(local, seed, remote), {
+        loading: false,
+        providerHint: suggestProviderHint(),
+        query,
+      });
+    } catch (err) {
+      if (signal.aborted) return;
+      renderPlaceSuggest(mergeSuggestionLists(local, seed), {
+        loading: false,
+        providerHint: `Lookup failed (${err.message}). You can still add this as a custom name.`,
+        query,
+      });
+    }
+  }
+
+  function schedulePlaceLookup() {
+    const query = addName.value.trim();
+    suggestQuery = query;
+    if (query.length < 2) {
+      hidePlaceSuggest();
+      return;
+    }
+    const local = localPlaceSuggestions(query);
+    const seed = seedPlaceSuggestions(query);
+    renderPlaceSuggest(mergeSuggestionLists(local, seed), {
+      loading: true,
+      providerHint: suggestProviderHint(),
+      query,
+    });
+    window.clearTimeout(suggestTimer);
+    suggestTimer = window.setTimeout(() => runPlaceLookup(query), 350);
+  }
+
+  async function choosePlaceSuggestion(item) {
+    if (item.kind === "local" && item.restaurant) {
+      jumpToPlace(item.restaurant);
+      return;
+    }
+    if (item.kind === "custom") {
+      hidePlaceSuggest();
+      commitCustomPlace(
+        {
+          name: item.name,
+          area: addArea.value.trim() || item.area || "",
+          cuisine: addCuisine.value.trim() || item.cuisine || "",
+          googleRating: parseGoogleRating(addGoogle.value),
+          tags: ["added_by_you"],
+        },
+        { confirmDuplicate: true }
+      );
+      return;
+    }
+    hidePlaceSuggest();
+    addName.value = item.name;
+    addArea.value = item.area || addArea.value;
+    addCuisine.value = item.cuisine || addCuisine.value;
+    let partial = {
+      name: item.name,
+      area: item.area || "",
+      cuisine: item.cuisine || "",
+      lat: item.lat,
+      lng: item.lng,
+      sources: item.sources || [],
+      external: item.external || null,
+      tags: ["added_by_you"],
+    };
+    if (item.provider === "mapbox" && item.mapboxId && hasMapboxToken() && item.lat == null) {
+      setStatus(`Looking up ${item.name}…`);
+      try {
+        const details = await fetchMapboxRetrieve(item.mapboxId);
+        partial = {
+          ...partial,
+          ...details,
+          name: details.name || item.name,
+          cuisine: details.cuisine || item.cuisine || "",
+        };
+        addName.value = partial.name;
+        addArea.value = partial.area || addArea.value;
+        addCuisine.value = partial.cuisine || addCuisine.value;
+      } catch (err) {
+        setStatus(`Couldn’t load Mapbox details (${err.message}); adding with suggestion text.`, true);
+      }
+    }
+    if (item.provider === "google" && item.placeId && hasGoogleKey()) {
+      setStatus(`Looking up ${item.name}…`);
+      try {
+        const details = await fetchGooglePlaceDetails(item.placeId);
+        partial = {
+          ...partial,
+          ...details,
+          name: details.name || item.name,
+          cuisine: details.cuisine || item.cuisine || "",
+        };
+        if (details.googleRating != null) {
+          addGoogle.value = String(details.googleRating);
+          partial.googleRating = details.googleRating;
+        }
+        addName.value = partial.name;
+        addArea.value = partial.area || addArea.value;
+        addCuisine.value = partial.cuisine || addCuisine.value;
+      } catch (err) {
+        setStatus(`Couldn’t load Google details (${err.message}); adding with suggestion text.`, true);
+      }
+    }
+    const existing = findExistingPlace(partial);
+    if (existing) {
+      jumpToPlace(existing);
+      return;
+    }
+    commitCustomPlace(partial, { confirmDuplicate: false });
+  }
+
+  function addCustomPlace(event) {
+    event.preventDefault();
+    if (!placeSuggestList.hidden && suggestActive >= 0 && suggestItems[suggestActive]) {
+      choosePlaceSuggestion(suggestItems[suggestActive]);
+      return;
+    }
+    const name = addName.value.trim();
+    if (!name) {
+      setStatus("Name is required to add a place.", true);
+      addName.focus();
+      return;
+    }
+    commitCustomPlace(
+      {
+        name,
+        area: addArea.value.trim(),
+        cuisine: addCuisine.value.trim(),
+        googleRating: parseGoogleRating(addGoogle.value),
+        tags: ["added_by_you"],
+      },
+      { confirmDuplicate: true }
+    );
   }
 
   function bindUI() {
@@ -378,40 +2305,153 @@
       renderList();
     });
 
+    cuisineSelect.addEventListener("change", () => {
+      cuisineFilter = cuisineSelect.value;
+      renderList();
+    });
+
     searchInput.addEventListener("input", () => {
       searchQuery = searchInput.value.trim();
       renderList();
     });
 
+    addForm.addEventListener("submit", addCustomPlace);
+    addName.addEventListener("input", schedulePlaceLookup);
+    addName.addEventListener("focus", () => {
+      if (addName.value.trim().length >= 2) schedulePlaceLookup();
+    });
+    addName.addEventListener("keydown", (e) => {
+      if (placeSuggestList.hidden || !suggestItems.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        suggestActive = Math.min(suggestItems.length - 1, suggestActive + 1);
+        renderPlaceSuggest(suggestItems, {
+          providerHint: suggestProviderHint(),
+          query: addName.value.trim(),
+        });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        suggestActive = Math.max(0, suggestActive - 1);
+        renderPlaceSuggest(suggestItems, {
+          providerHint: suggestProviderHint(),
+          query: addName.value.trim(),
+        });
+      } else if (e.key === "Enter" && suggestActive >= 0) {
+        e.preventDefault();
+        choosePlaceSuggestion(suggestItems[suggestActive]);
+      } else if (e.key === "Escape") {
+        hidePlaceSuggest();
+      }
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".add-panel")) hidePlaceSuggest();
+    });
+    $("#btn-places-settings").addEventListener("click", () => {
+      const open = placesSettings.hidden;
+      if (open) {
+        openPlacesSettings(mapboxTokenInput);
+        refreshPlacesProviderStatus();
+      } else {
+        placesSettings.hidden = true;
+        $("#btn-places-settings").setAttribute("aria-expanded", "false");
+      }
+    });
+    $("#btn-save-mapbox").addEventListener("click", () => {
+      try {
+        settings.mapboxAccessToken = parseMapboxToken(mapboxTokenInput.value);
+      } catch (err) {
+        setStatus(err.message, true);
+        return;
+      }
+      mapboxSessionError = "";
+      rotateMapboxSession();
+      saveSettings();
+      setStatus(
+        settings.mapboxAccessToken
+          ? "Mapbox token saved in this browser. Suggestions will use Mapbox Search Box."
+          : "Cleared Mapbox token."
+      );
+    });
+    $("#btn-clear-mapbox").addEventListener("click", () => {
+      mapboxTokenInput.value = "";
+      settings.mapboxAccessToken = "";
+      mapboxSessionError = "";
+      rotateMapboxSession();
+      saveSettings();
+      setStatus(
+        hasGoogleKey()
+          ? "Mapbox cleared. Suggestions will use Google Places if the key still works."
+          : "Mapbox cleared. Using the verified Coimbatore list + OpenStreetMap."
+      );
+    });
+    $("#btn-save-key").addEventListener("click", () => {
+      settings.googlePlacesApiKey = googleKeyInput.value.trim();
+      googleSessionError = "";
+      saveSettings();
+      setStatus(
+        settings.googlePlacesApiKey
+          ? "Google Places key saved in this browser. Used only if Mapbox is not set."
+          : "Cleared Google key."
+      );
+    });
+    $("#btn-clear-key").addEventListener("click", () => {
+      googleKeyInput.value = "";
+      settings.googlePlacesApiKey = "";
+      googleSessionError = "";
+      saveSettings();
+      setStatus("Google key cleared.");
+    });
     $("#btn-suggest").addEventListener("click", pickSuggestions);
     $("#suggest-close").addEventListener("click", () => {
       suggestPanel.hidden = true;
     });
     $("#btn-nearby").addEventListener("click", requestNearby);
-    $("#btn-export").addEventListener("click", exportVisited);
+    $("#btn-export").addEventListener("click", exportState);
     $("#import-file").addEventListener("change", (e) => {
       const file = e.target.files && e.target.files[0];
-      if (file) importVisited(file);
+      if (file) importState(file);
       e.target.value = "";
     });
   }
 
   async function init() {
-    loadVisited();
+    loadState();
+    loadSettings();
     bindUI();
+    refreshPlacesProviderStatus();
+    rebuildRestaurants();
     try {
-      const res = await fetch("restaurants.json");
+      const res = await fetch(`restaurants.json?v=${ASSET_V}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      restaurants = Array.isArray(data) ? data : data.restaurants || [];
-      if (restaurants.length === 0) throw new Error("No restaurants in JSON");
-      populateAreas();
+      curated = Array.isArray(data) ? data : data.restaurants || [];
+      if (curated.length === 0) throw new Error("No restaurants in JSON");
+      try {
+        const seedRes = await fetch(`autocomplete-seed.json?v=${ASSET_V}`);
+        if (seedRes.ok) {
+          const seedData = await seedRes.json();
+          const places = Array.isArray(seedData) ? seedData : seedData.places || [];
+          autocompleteSeed = places.length ? places : FALLBACK_SEED;
+        } else {
+          autocompleteSeed = FALLBACK_SEED;
+        }
+      } catch {
+        autocompleteSeed = FALLBACK_SEED;
+      }
+      rebuildRestaurants();
+      refreshFilterOptions();
       updateStats();
       renderList();
     } catch (err) {
-      listMeta.textContent = "";
-      emptyEl.hidden = false;
-      emptyEl.textContent = `Couldn’t load restaurants.json (${err.message}). Serve this folder over HTTP (e.g. python3 -m http.server) — file:// often blocks fetch.`;
+      refreshFilterOptions();
+      updateStats();
+      renderList();
+      emptyEl.hidden = restaurants.length === 0;
+      if (restaurants.length === 0) {
+        emptyEl.textContent = `Couldn’t load restaurants.json (${err.message}). Serve this folder over HTTP (e.g. python3 -m http.server) — file:// often blocks fetch.`;
+      } else {
+        setStatus(`Curated list failed to load (${err.message}); showing your added places.`, true);
+      }
     }
   }
 
