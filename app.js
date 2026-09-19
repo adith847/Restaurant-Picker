@@ -9,7 +9,7 @@
   const CBE_BBOX = "76.80,10.85,77.18,11.22";
   const CBE_PROXIMITY = "76.9558,11.0168";
   /** Bump when JS/JSON change so GitHub/raw.githack previews do not keep a stale app.js. */
-  const ASSET_V = "20260919-5";
+  const ASSET_V = "20260919-6";
   /** Used if autocomplete-seed.json fails to load (common on cached previews). */
   const FALLBACK_SEED = [
     {
@@ -516,6 +516,74 @@
     return typeof r.lat === "number" && typeof r.lng === "number";
   }
 
+  function mapsQueryFor(r) {
+    if (hasCoords(r)) return `${r.lat},${r.lng}`;
+    return [r.name, r.area, "Coimbatore"].filter(Boolean).join(", ");
+  }
+
+  function mapsSearchUrl(r) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQueryFor(r))}`;
+  }
+
+  function mapsDirectionsUrl(r) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapsQueryFor(r))}`;
+  }
+
+  function httpSources(r) {
+    return (Array.isArray(r.sources) ? r.sources : []).filter((url) => /^https?:\/\//i.test(String(url)));
+  }
+
+  function sourceHost(url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  }
+
+  function isZomatoUrl(url) {
+    return /zomato\.com$/i.test(sourceHost(url)) || /(^|\.)zomato\.com$/i.test(sourceHost(url));
+  }
+
+  function zomatoAction(r) {
+    const existing = httpSources(r).find((url) => isZomatoUrl(url));
+    if (existing) {
+      return { href: existing, label: "Open on Zomato", search: false };
+    }
+    return {
+      href: `https://www.zomato.com/coimbatore/restaurants?q=${encodeURIComponent(r.name)}`,
+      label: "Search on Zomato",
+      search: true,
+    };
+  }
+
+  function sourceActionLabel(url) {
+    const host = sourceHost(url);
+    if (/thehindu\.com/i.test(host)) return "The Hindu";
+    if (/ndtv\.com/i.test(host)) return "NDTV";
+    if (/swiggy\.com/i.test(host)) return "Swiggy";
+    if (/tripadvisor\./i.test(host)) return "TripAdvisor";
+    if (/openstreetmap\.org/i.test(host)) return "OpenStreetMap";
+    if (/district\.in/i.test(host)) return "district.in";
+    if (/google\./i.test(host)) return "Google listing";
+    if (host) return host.replace(/\.[a-z]{2,}$/i, "");
+    return "Source";
+  }
+
+  function placeActionLinks(r) {
+    const zomato = zomatoAction(r);
+    const extras = httpSources(r)
+      .filter((url) => !isZomatoUrl(url))
+      .slice(0, 2)
+      .map((url) => ({ href: url, label: sourceActionLabel(url) }));
+    return [
+      { href: mapsSearchUrl(r), label: "Maps" },
+      { href: mapsDirectionsUrl(r), label: "Directions" },
+      zomato,
+      ...extras,
+    ];
+  }
+
   function formatDistance(km) {
     if (km < 1) return `${Math.round(km * 1000)} m away`;
     return `${km.toFixed(1)} km away`;
@@ -722,22 +790,15 @@
       distanceHtml = `<p class="distance">Location unknown</p>`;
     }
 
-    const sources = Array.isArray(r.sources) ? r.sources : [];
-    const linksHtml =
-      sources.length > 0
-        ? `<p class="card-links">${sources
-            .slice(0, 2)
-            .map((url) => {
-              let label = "Source";
-              try {
-                label = new URL(url).hostname.replace(/^www\./, "");
-              } catch {
-                /* keep */
-              }
-              return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
-            })
-            .join(" · ")}</p>`
-        : "";
+    const mapsUrl = mapsSearchUrl(r);
+    const actionsHtml = `<div class="place-actions" role="group" aria-label="Open ${escapeAttr(r.name)}">
+      ${placeActionLinks(r)
+        .map(
+          (link) =>
+            `<a class="place-action${link.search ? " is-search" : ""}" href="${escapeAttr(link.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`
+        )
+        .join("")}
+    </div>`;
 
     const hood = neighbourhood(r.area);
     const areaLabel = r.area && hood !== r.area ? `${hood} · ${r.area}` : r.area || hood;
@@ -779,7 +840,9 @@
       </label>
       <div class="card-body">
         <div class="card-top">
-          <h2 class="card-name">${escapeHtml(r.name)}</h2>
+          <h2 class="card-name">
+            <a class="card-name-link" href="${escapeAttr(mapsUrl)}" target="_blank" rel="noopener noreferrer" title="Open in Google Maps">${escapeHtml(r.name)}</a>
+          </h2>
           <span class="price">${escapeHtml(r.price || "")}</span>
           ${customBadge}
           ${googleHtml}
@@ -792,7 +855,7 @@
         ${r.blurb ? `<p class="blurb">${escapeHtml(r.blurb)}</p>` : ""}
         <ul class="tags">${tagsHtml}</ul>
         ${distanceHtml}
-        ${linksHtml}
+        ${actionsHtml}
         <div class="personal">
           <p class="personal-label">Your rating</p>
           ${starButtons(n.rating, r.name)}

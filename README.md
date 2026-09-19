@@ -27,7 +27,7 @@ Any static server works (`npx serve`, `php -S`, etc.).
 - Filters: All / Untried / Visited, neighbourhood area, cuisine bucket, name/cuisine/dish search
 - Stats: total / visited / remaining / your adds
 - **Suggest for me**: 1–3 untried picks ranked with the active cuisine (and area) filter, your rating, optional saved Google ★ on places you added, and liked dishes that match that cuisine vibe. Curated JSON has no invented Google ratings — those stars are only used when you saved them on a custom place. Editorial `highly_rated` tags are a tiny tie-break, not a fake score.
-- **Nearby**: geolocation; sorts untried with lat/lng by distance; null coords last; soft-fails if denied
+- **Maps / Directions / Zomato / sources**: the place name opens Google Maps. An action row adds Maps, Directions, and Zomato (existing `zomato.com` source if present, otherwise a Coimbatore **search** URL — not a live listing). Extra `sources[]` http(s) links (The Hindu, official site, …) are outbound too. The old Zomato v2.1 API (`developers.zomato.com`) is dead; we do **not** fetch ratings or reviews from it.
 - Export / import a JSON backup of visits, notes, custom places, and hidden curated ids
 
 All of that is **browser-local**. It never leaves your browser unless you export it. Clearing site data or using another device/browser starts you from an empty personal list (the curated 47 still load).
@@ -62,8 +62,8 @@ The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil N
 - Windows/Linux: `Ctrl+Shift+R` · Mac: `Cmd+Shift+R`
 - Prefer a **commit-pinned** rawcdn URL (not the branch raw.githack URL, which caches):  
   `https://rawcdn.githack.com/adith847/Restaurant-Picker/<commit-sha>/index.html`
-- Or open with a timestamp: `index.html?v=20260919-5`  
-  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-5`.
+- Or open with a timestamp: `index.html?v=20260919-6`  
+  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-6`.
 
 ### How Adi adds a Mapbox token (recommended)
 
