@@ -209,6 +209,15 @@ h1 {
   margin-bottom: 0.85rem;
 }
 
+.add-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.85rem;
+}
+
 .add-head h2 {
   margin: 0;
   font-family: var(--font-display);
@@ -217,9 +226,139 @@ h1 {
 }
 
 .add-head p {
-  margin: 0.3rem 0 0.85rem;
+  margin: 0.3rem 0 0;
   color: var(--ink-soft);
   font-size: 0.92rem;
+}
+
+.add-panel {
+  position: relative;
+}
+
+.places-settings {
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 0.85rem;
+}
+
+.settings-status {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--sage);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.55rem 0 0.7rem;
+}
+
+.settings-help {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.settings-help code {
+  font-size: 0.74rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.25rem;
+  word-break: break-all;
+}
+
+.place-suggest {
+  list-style: none;
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  margin: 0.35rem 0 0;
+  padding: 0.3rem 0;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  max-height: min(22rem, 60vh);
+  overflow: auto;
+  z-index: 20;
+}
+
+.place-suggest-head,
+.place-suggest-foot {
+  padding: 0.35rem 0.9rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.place-suggest-foot {
+  border-top: 1px dashed var(--border);
+  margin-top: 0.2rem;
+  padding-top: 0.5rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+
+.place-suggest-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  color: inherit;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+}
+
+.place-suggest-item:hover,
+.place-suggest-item.is-active {
+  background: var(--cream-deep);
+}
+
+.place-suggest-name {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.place-suggest-meta {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.place-suggest-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--terracotta-deep);
+  background: #f3d7a4;
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  vertical-align: middle;
+}
+
+.suggest-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .add-form {

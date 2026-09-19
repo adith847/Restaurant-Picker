@@ -33,13 +33,37 @@
 
   <section class="add-panel" aria-label="Add a restaurant">
     <div class="add-head">
-      <h2>Add to my list</h2>
-      <p>Type a restaurant or café name to keep places beyond the curated 47. Area and cuisine are optional — you can edit them later.</p>
+      <div>
+        <h2>Add to my list</h2>
+        <p>Type a name — live Coimbatore suggestions appear as you type. Click one to add it, or keep a custom name if nothing matches.</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-tiny" id="btn-places-settings" aria-expanded="false" aria-controls="places-settings">Places search</button>
+    </div>
+    <div id="places-settings" class="places-settings" hidden>
+      <p class="settings-status" id="places-provider-status"></p>
+      <label class="field field-grow">
+        <span class="field-label">Google Places API key (stays in this browser)</span>
+        <input id="google-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste key — never committed to the repo" />
+      </label>
+      <div class="settings-actions">
+        <button type="button" class="btn btn-secondary" id="btn-save-key">Save key</button>
+        <button type="button" class="btn btn-ghost" id="btn-clear-key">Use OSM only</button>
+      </div>
+      <p class="settings-help">
+        Without a key, search uses OpenStreetMap (Nominatim + Photon), biased to Coimbatore.
+        For Google-quality autocomplete: in Google Cloud enable <strong>Places API (New)</strong>, create an API key,
+        restrict it to HTTP referrers
+        <code>https://adith847.github.io/*</code>,
+        <code>https://raw.githack.com/adith847/Restaurant-Picker/*</code>,
+        <code>https://rawcdn.githack.com/adith847/Restaurant-Picker/*</code>,
+        <code>http://127.0.0.1:*</code> and <code>http://localhost:*</code>,
+        and limit the key to Places API (New). Paste it here — it is stored in <code>localStorage</code> only, not in backups or git.
+      </p>
     </div>
     <form id="add-form" class="add-form">
-      <label class="field field-grow">
+      <label class="field field-grow add-name-field">
         <span class="field-label">Name</span>
-        <input id="add-name" name="name" required placeholder="e.g. a café in RS Puram" autocomplete="off" />
+        <input id="add-name" name="name" required placeholder="e.g. The Living Room" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="place-suggest-list" aria-haspopup="listbox" />
       </label>
       <label class="field">
         <span class="field-label">Area</span>
@@ -55,6 +79,8 @@
       </label>
       <button type="submit" class="btn btn-primary" id="btn-add">Add place</button>
     </form>
+    <ul id="place-suggest-list" class="place-suggest" hidden role="listbox" aria-label="Place suggestions"></ul>
+    <p class="suggest-live" id="place-suggest-live" aria-live="polite"></p>
     <datalist id="area-suggestions"></datalist>
     <datalist id="cuisine-suggestions"></datalist>
   </section>

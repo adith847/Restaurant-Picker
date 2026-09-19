@@ -21,7 +21,7 @@ Any static server works (`npx serve`, `php -S`, etc.).
 ## Features
 
 - List: name, area, cuisine, price, blurb, tag chips — grouped by neighbourhood (RS Puram, Race Course, Gandhipuram, Peelamedu, …)
-- **Add to my list**: type a restaurant or café name (required); area, cuisine, and an optional Google ★ are editable and join the same list/filters
+- **Add to my list**: live Coimbatore place suggestions as you type (Google Places if you paste a key; otherwise OpenStreetMap). Click a match to add it with name/area/coords/type when the API returns them, or keep a fully custom name. Personal Google ★ is still optional and never invented.
 - **I’ve been** checkbox per place
 - **Your rating** (1–5 stars, separate from any Google/editorial score) and **liked dishes** per place
 - Filters: All / Untried / Visited, neighbourhood area, cuisine bucket, name/cuisine/dish search
@@ -38,10 +38,38 @@ All of that is **browser-local**. It never leaves your browser unless you export
 |-----|------|
 | `cbe-picker-state-v2` | Canonical state: `{ version: 2, visited: string[], notes: { [id]: { rating, dishes } }, customPlaces: [...] }` |
 | `cbe-picker-visited-v1` | Legacy visited-id array. Still **read** if v2 is missing, and **mirrored** on save so older backups/ticks are not stranded. |
+| `cbe-picker-settings-v1` | `{ googlePlacesApiKey }` only. **Not** exported, **not** committed. Lives in this browser so a key never lands in git or backup JSON. |
 
 Export writes `coimbatore-picker.json` (v2). Import accepts v2 backups **or** the older `{ visited: string[] }` / raw id-array files.
 
 Custom places merge with the curated 47; they never overwrite `restaurants.json`.
+
+## Place autocomplete (Coimbatore-biased)
+
+The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil Nadu.
+
+1. **Already on your list** — curated + custom names match first. Clicking jumps to that card instead of duplicating it (e.g. **The Living Room**).
+2. **Google Places Autocomplete (New)** — if you save an API key in **Places search**. Place Details may pre-fill area, coordinates, a Google ★, and a Maps link *only when Google returns those fields*.
+3. **OpenStreetMap fallback** — Nominatim + Photon, biased to Coimbatore, when no key is set (or Google requests fail). Coverage is thinner than Google; a short hint in settings explains that.
+
+### How Adi adds a Google key (optional)
+
+Do this in [Google Cloud Console](https://console.cloud.google.com/). Never paste a real key into the repo.
+
+1. Create or select a project and enable billing (Places is a paid API; Google often includes a monthly credit).
+2. Enable **Places API (New)** (not only the legacy Places API).
+3. **APIs & Services → Credentials → Create credentials → API key**.
+4. Restrict the key:
+   - **Application restrictions → HTTP referrers (web sites)**  
+     `https://adith847.github.io/*`  
+     `https://raw.githack.com/adith847/Restaurant-Picker/*`  
+     `https://rawcdn.githack.com/adith847/Restaurant-Picker/*`  
+     `http://127.0.0.1:*`  
+     `http://localhost:*`
+   - **API restrictions → Restrict key → Places API (New)**
+5. Open the picker → **Places search** → paste the key → **Save key**. It is stored as `cbe-picker-settings-v1` in `localStorage` on that machine/browser only.
+
+Without a key, type a known Kovai name (e.g. Starbucks, Haribhavanam, Sree Annapoorna) and OSM suggestions should still appear. You can always click **Add place** with a custom name if nothing matches.
 
 ## Files
 
@@ -49,7 +77,7 @@ Custom places merge with the curated 47; they never overwrite `restaurants.json`
 |------|------|
 | `index.html` | Markup |
 | `styles.css` | Warm food-app styling |
-| `app.js` | Filters, localStorage, add/rate/dishes, suggest, geolocation, import/export |
+| `app.js` | Filters, localStorage, add/autocomplete/rate/dishes, suggest, geolocation, import/export |
 | `restaurants.json` | 47 Coimbatore restaurants (do not invent extra places, hours, dishes, or numeric Google ratings) |
 
 ## Repo notes

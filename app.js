@@ -3,6 +3,9 @@
 
   const STORAGE_KEY_V1 = "cbe-picker-visited-v1";
   const STORAGE_KEY = "cbe-picker-state-v2";
+  const SETTINGS_KEY = "cbe-picker-settings-v1";
+  const CBE_CENTER = { lat: 11.0168, lng: 76.9558 };
+  const CBE_RADIUS_KM = 40;
 
   /** Neighbourhood buckets so detailed hotel addresses still filter as RS Puram / Race Course / etc. */
   const AREA_RULES = [
@@ -108,6 +111,19 @@
   const addGoogle = $("#add-google");
   const areaDatalist = $("#area-suggestions");
   const cuisineDatalist = $("#cuisine-suggestions");
+  const placeSuggestList = $("#place-suggest-list");
+  const placeSuggestLive = $("#place-suggest-live");
+  const placesSettings = $("#places-settings");
+  const googleKeyInput = $("#google-key");
+  const placesProviderStatus = $("#places-provider-status");
+
+  let settings = { googlePlacesApiKey: "" };
+  let googleSessionError = "";
+  let suggestTimer = 0;
+  let suggestAbort = null;
+  let suggestItems = [];
+  let suggestActive = -1;
+  let suggestQuery = "";
 
   function loadState() {
     visited = new Set();
@@ -135,6 +151,49 @@
       }
     } catch {
       visited = new Set();
+    }
+  }
+
+  function loadSettings() {
+    settings = { googlePlacesApiKey: "" };
+    googleSessionError = "";
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.googlePlacesApiKey === "string") {
+        settings.googlePlacesApiKey = parsed.googlePlacesApiKey.trim();
+      }
+    } catch {
+      settings = { googlePlacesApiKey: "" };
+    }
+  }
+
+  function saveSettings() {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ googlePlacesApiKey: settings.googlePlacesApiKey })
+    );
+    refreshPlacesProviderStatus();
+  }
+
+  function hasGoogleKey() {
+    return Boolean(settings.googlePlacesApiKey) && !googleSessionError;
+  }
+
+  function refreshPlacesProviderStatus() {
+    if (!placesProviderStatus) return;
+    if (settings.googlePlacesApiKey && !googleSessionError) {
+      placesProviderStatus.textContent =
+        "Using Google Places Autocomplete (New), biased to Coimbatore. Key stays in this browser only.";
+    } else if (settings.googlePlacesApiKey && googleSessionError) {
+      placesProviderStatus.textContent = `Google key saved but requests failed (${googleSessionError}). Falling back to OpenStreetMap.`;
+    } else {
+      placesProviderStatus.textContent =
+        "Using OpenStreetMap (Nominatim + Photon) for Coimbatore matches. Add a Google key for better autocomplete.";
+    }
+    if (googleKeyInput && googleKeyInput !== document.activeElement) {
+      googleKeyInput.value = settings.googlePlacesApiKey;
     }
   }
 
@@ -207,6 +266,13 @@
       googleRating,
       custom: true,
       createdAt: place.createdAt || new Date().toISOString(),
+      external:
+        place.external && place.external.provider && place.external.id
+          ? {
+              provider: String(place.external.provider),
+              id: String(place.external.id),
+            }
+          : null,
     };
   }
 
@@ -906,45 +972,167 @@
     reader.readAsText(file);
   }
 
-  function addCustomPlace(event) {
-    event.preventDefault();
-    const name = addName.value.trim();
-    if (!name) {
-      setStatus("Name is required to add a place.", true);
-      addName.focus();
-      return;
-    }
+  function nameKey(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/['’]/g, "")
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
 
-    const existing = restaurants.find(
-      (r) => r.name.toLowerCase() === name.toLowerCase()
+  function inCoimbatore(lat, lng, haystack) {
+    const text = String(haystack || "").toLowerCase();
+    if (/coimbatore|kovai|கோயம்புத்தூர்/.test(text)) return true;
+    if (typeof lat !== "number" || typeof lng !== "number") return /tamil\s*nadu/.test(text);
+    return haversineKm(CBE_CENTER, { lat, lng }) <= CBE_RADIUS_KM;
+  }
+
+  function humanPlaceType(raw) {
+    const t = String(raw || "").toLowerCase().replace(/_/g, " ");
+    if (!t) return "";
+    if (/south indian/.test(t)) return "South Indian restaurant";
+    if (/north indian/.test(t)) return "North Indian restaurant";
+    if (/italian/.test(t)) return "Italian restaurant";
+    if (t === "cafe" || t === "coffee shop") return "Café";
+    if (t === "bar" || t === "pub" || t === "night club") return "Bar";
+    if (t === "bakery") return "Bakery";
+    if (t === "fast food" || t === "meal takeaway") return "Fast food";
+    if (t === "restaurant") return "Restaurant";
+    if (t === "food court") return "Food court";
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function cuisineFromType(type, extraCuisine) {
+    const mapped = (value) => {
+      const t = String(value || "")
+        .toLowerCase()
+        .replace(/_/g, " ")
+        .trim();
+      if (!t) return "";
+      if (/south indian/.test(t)) return "South Indian";
+      if (/north indian/.test(t)) return "North Indian";
+      if (/italian/.test(t)) return "Italian";
+      if (/chinese|thai|japanese|korean|asian/.test(t)) return "Asian";
+      if (t === "cafe" || t === "coffee shop") return "Café";
+      if (t === "bar" || t === "pub" || t === "night club") return "Bar & pub";
+      if (t === "bakery") return "Bakery";
+      if (t === "fast food" || t === "meal takeaway") return "Fast food";
+      if (t === "restaurant" || t === "yes" || t === "amenity") return "";
+      return "";
+    };
+    const fromType = mapped(type);
+    if (extraCuisine) {
+      const extraMapped = mapped(extraCuisine);
+      if (extraMapped) return extraMapped;
+      const bits = String(extraCuisine)
+        .split(/[;,/]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.replace(/_/g, " "))
+        .filter((s) => !mapped(s) && !/^(cafe|coffee shop|restaurant|bar|pub|yes)$/i.test(s));
+      if (bits.length) return bits.join(" / ");
+    }
+    return fromType;
+  }
+
+  function areaFromAddressParts(parts) {
+    const keys = [
+      "suburb",
+      "neighbourhood",
+      "neighborhood",
+      "city_district",
+      "quarter",
+      "village",
+      "town",
+      "county",
+      "road",
+    ];
+    for (const key of keys) {
+      if (parts && parts[key]) {
+        const hood = neighbourhood(parts[key]);
+        if (hood && hood !== "Unspecified") return hood === parts[key] ? parts[key] : hood;
+      }
+    }
+    if (parts && parts.city && /coimbatore/i.test(parts.city)) return parts.suburb || parts.city;
+    return (parts && (parts.suburb || parts.city)) || "";
+  }
+
+  function areaFromGoogleComponents(components) {
+    if (!Array.isArray(components)) return "";
+    const byType = (type) => {
+      const hit = components.find((c) => Array.isArray(c.types) && c.types.includes(type));
+      return hit && (hit.longText || hit.shortText || "");
+    };
+    return (
+      byType("sublocality_level_1") ||
+      byType("sublocality") ||
+      byType("neighborhood") ||
+      byType("administrative_area_level_3") ||
+      byType("locality") ||
+      ""
     );
+  }
+
+  function findExistingPlace(partial) {
+    if (partial && partial.external && partial.external.id) {
+      const byExt = restaurants.find(
+        (r) =>
+          r.external &&
+          r.external.provider === partial.external.provider &&
+          r.external.id === partial.external.id
+      );
+      if (byExt) return byExt;
+    }
+    const key = nameKey(partial && partial.name);
+    if (!key) return null;
+    return restaurants.find((r) => nameKey(r.name) === key) || null;
+  }
+
+  function jumpToPlace(r, message) {
+    searchInput.value = r.name;
+    searchQuery = r.name;
+    hidePlaceSuggest();
+    renderList();
+    requestAnimationFrame(() => {
+      document.querySelector(`.card[data-id="${CSS.escape(r.id)}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    setStatus(message || `${r.name} is already on your list — jumped to it.`);
+  }
+
+  function commitCustomPlace(partial, { confirmDuplicate = true } = {}) {
+    const existing = findExistingPlace(partial);
     if (existing) {
+      if (!confirmDuplicate) {
+        jumpToPlace(existing);
+        return existing;
+      }
       const again = window.confirm(
         `“${existing.name}” is already on the list. Add another copy anyway?`
       );
       if (!again) {
-        searchInput.value = name;
-        searchQuery = name;
-        renderList();
-        document.querySelector(`.card[data-id="${CSS.escape(existing.id)}"]`)?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-        setStatus(`${existing.name} is already listed — jumped to it.`);
-        return;
+        jumpToPlace(existing);
+        return existing;
       }
     }
-
     const place = normalizeCustomPlace({
-      id: newCustomId(name),
-      name,
-      area: addArea.value.trim(),
-      cuisine: addCuisine.value.trim(),
-      googleRating: parseGoogleRating(addGoogle.value),
-      tags: ["added_by_you"],
+      id: newCustomId(partial.name),
+      name: partial.name,
+      area: partial.area || "",
+      cuisine: partial.cuisine || "",
+      googleRating: partial.googleRating,
+      lat: partial.lat,
+      lng: partial.lng,
+      sources: partial.sources || [],
+      tags: partial.tags || ["added_by_you"],
+      external: partial.external || null,
       custom: true,
       createdAt: new Date().toISOString(),
     });
+    if (!place) return null;
     customPlaces.push(place);
     saveState();
     rebuildRestaurants();
@@ -953,6 +1141,7 @@
     addForm.reset();
     searchInput.value = "";
     searchQuery = "";
+    hidePlaceSuggest();
     renderList();
     requestAnimationFrame(() => {
       document.querySelector(`.card[data-id="${CSS.escape(place.id)}"]`)?.scrollIntoView({
@@ -961,6 +1150,465 @@
       });
     });
     setStatus(`Added ${place.name} to your list.`);
+    return place;
+  }
+
+  function localPlaceSuggestions(query) {
+    const q = query.toLowerCase();
+    return restaurants
+      .filter((r) => r.name.toLowerCase().includes(q))
+      .slice(0, 5)
+      .map((r) => ({
+        kind: "local",
+        restaurant: r,
+        name: r.name,
+        area: neighbourhood(r.area) || r.area,
+        typeLabel: r.cuisine || "On your list",
+        providerLabel: "Already on your list",
+      }));
+  }
+
+  function hidePlaceSuggest() {
+    suggestItems = [];
+    suggestActive = -1;
+    suggestQuery = "";
+    if (suggestAbort) {
+      suggestAbort.abort();
+      suggestAbort = null;
+    }
+    placeSuggestList.hidden = true;
+    placeSuggestList.innerHTML = "";
+    addName.setAttribute("aria-expanded", "false");
+    placeSuggestLive.textContent = "";
+  }
+
+  function renderPlaceSuggest(items, { loading, providerHint } = {}) {
+    suggestItems = items;
+    if (suggestActive >= items.length) suggestActive = items.length - 1;
+    if (!items.length && !loading) {
+      placeSuggestList.hidden = true;
+      placeSuggestList.innerHTML = "";
+      addName.setAttribute("aria-expanded", "false");
+      placeSuggestLive.textContent = "No place suggestions";
+      return;
+    }
+    const head = `<li class="place-suggest-head" role="presentation">Is this the place?</li>`;
+    const rows = items
+      .map((item, i) => {
+        const badge =
+          item.kind === "local"
+            ? `<span class="place-suggest-badge">On your list</span>`
+            : "";
+        const meta = [item.area, item.typeLabel, item.providerLabel]
+          .filter(Boolean)
+          .join(" · ");
+        return `<li role="presentation">
+          <button type="button" class="place-suggest-item${i === suggestActive ? " is-active" : ""}" role="option" id="place-opt-${i}" data-index="${i}" aria-selected="${i === suggestActive ? "true" : "false"}">
+            <span class="place-suggest-name">${escapeHtml(item.name)} ${badge}</span>
+            <span class="place-suggest-meta">${escapeHtml(meta)}</span>
+          </button>
+        </li>`;
+      })
+      .join("");
+    const footBits = [];
+    if (loading) footBits.push("Searching Coimbatore…");
+    if (providerHint) footBits.push(providerHint);
+    footBits.push("No match? Keep the name and click Add place for a custom entry.");
+    const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" "))}</li>`;
+    placeSuggestList.innerHTML = head + rows + foot;
+    placeSuggestList.hidden = false;
+    addName.setAttribute("aria-expanded", "true");
+    placeSuggestLive.textContent = loading
+      ? "Searching places"
+      : `${items.length} suggestion${items.length === 1 ? "" : "s"}`;
+    placeSuggestList.querySelectorAll(".place-suggest-item").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.index);
+        if (suggestItems[idx]) choosePlaceSuggestion(suggestItems[idx]);
+      });
+    });
+  }
+
+  function mergeSuggestionLists(local, remote) {
+    const seen = new Set(local.map((item) => nameKey(item.name)));
+    const extra = [];
+    for (const item of remote) {
+      const key = nameKey(item.name);
+      if (key && seen.has(key) && findExistingPlace(item)) continue;
+      extra.push(item);
+      if (key) seen.add(key);
+    }
+    return [...local, ...extra].slice(0, 8);
+  }
+
+  async function fetchGoogleAutocomplete(query, signal) {
+    const key = settings.googlePlacesApiKey;
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask":
+          "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.types",
+      },
+      body: JSON.stringify({
+        input: query,
+        languageCode: "en",
+        includedRegionCodes: ["in"],
+        locationBias: {
+          circle: {
+            center: { latitude: CBE_CENTER.lat, longitude: CBE_CENTER.lng },
+            radius: 30000,
+          },
+        },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = (data.error && data.error.message) || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return (data.suggestions || [])
+      .map((row) => row.placePrediction)
+      .filter(Boolean)
+      .map((pred) => {
+        const name =
+          (pred.structuredFormat &&
+            pred.structuredFormat.mainText &&
+            pred.structuredFormat.mainText.text) ||
+          (pred.text && pred.text.text) ||
+          "";
+        const secondary =
+          (pred.structuredFormat &&
+            pred.structuredFormat.secondaryText &&
+            pred.structuredFormat.secondaryText.text) ||
+          "";
+        const types = Array.isArray(pred.types) ? pred.types : [];
+        const primary = types.find((t) =>
+          /restaurant|cafe|bar|bakery|food|meal/i.test(t)
+        ) || types[0] || "";
+        return {
+          kind: "remote",
+          provider: "google",
+          placeId: pred.placeId,
+          name,
+          area: secondary.split(",")[0] || secondary,
+          address: secondary,
+          typeLabel: humanPlaceType(primary),
+          cuisine: cuisineFromType(primary),
+          providerLabel: "Google",
+          types,
+        };
+      })
+      .filter((item) => {
+        if (!item.name) return false;
+        const hay = `${item.name} ${item.address}`;
+        if (
+          /bengaluru|bangalore|chennai|hyderabad|mumbai|delhi|pune|kochi|madurai|mysuru|mysore/i.test(
+            hay
+          ) &&
+          !/coimbatore|kovai/i.test(hay)
+        ) {
+          return false;
+        }
+        return true;
+      });
+  }
+
+  async function fetchGooglePlaceDetails(placeId) {
+    const key = settings.googlePlacesApiKey;
+    const res = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+      {
+        headers: {
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask":
+            "id,displayName,formattedAddress,location,types,primaryType,primaryTypeDisplayName,addressComponents,rating,googleMapsUri",
+        },
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.error && data.error.message) || `HTTP ${res.status}`);
+    const name = (data.displayName && data.displayName.text) || "";
+    const types = Array.isArray(data.types) ? data.types : [];
+    const primary = data.primaryType || types[0] || "";
+    const lat =
+      data.location && typeof data.location.latitude === "number"
+        ? data.location.latitude
+        : null;
+    const lng =
+      data.location && typeof data.location.longitude === "number"
+        ? data.location.longitude
+        : null;
+    return {
+      name,
+      area: areaFromGoogleComponents(data.addressComponents) || "",
+      cuisine: cuisineFromType(primary),
+      lat,
+      lng,
+      googleRating: parseGoogleRating(data.rating),
+      sources: data.googleMapsUri ? [data.googleMapsUri] : [],
+      tags: ["added_by_you"],
+      external: { provider: "google", id: data.id || placeId },
+    };
+  }
+
+  function nominatimToItem(row) {
+    const lat = Number(row.lat);
+    const lng = Number(row.lon);
+    const address = row.address || {};
+    const hay = `${row.display_name || ""} ${row.name || ""}`;
+    if (!inCoimbatore(lat, lng, hay)) return null;
+    const type = row.type || row.category || "";
+    const extra = (row.extratags && (row.extratags.cuisine || row.extratags.amenity)) || "";
+    const osmType =
+      row.osm_type === "node" ? "node" : row.osm_type === "way" ? "way" : "relation";
+    return {
+      kind: "remote",
+      provider: "osm",
+      name: row.name || (row.display_name || "").split(",")[0],
+      area: areaFromAddressParts(address),
+      address: row.display_name || "",
+      typeLabel: humanPlaceType(type),
+      cuisine: cuisineFromType(type, row.extratags && row.extratags.cuisine),
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      providerLabel: "OpenStreetMap",
+      sources: row.osm_id ? [`https://www.openstreetmap.org/${osmType}/${row.osm_id}`] : [],
+      external: row.osm_id
+        ? { provider: "osm", id: `${row.osm_type}:${row.osm_id}` }
+        : null,
+      extra,
+    };
+  }
+
+  function photonToItem(feature) {
+    const props = feature.properties || {};
+    const coords = (feature.geometry && feature.geometry.coordinates) || [];
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    const hay = [props.name, props.city, props.state, props.district, props.locality, props.street]
+      .filter(Boolean)
+      .join(" ");
+    if (!inCoimbatore(lat, lng, hay)) return null;
+    const osmType = props.osm_type === "N" ? "node" : props.osm_type === "W" ? "way" : "relation";
+    return {
+      kind: "remote",
+      provider: "osm",
+      name: props.name || "",
+      area: areaFromAddressParts({
+        suburb: props.locality || props.district,
+        neighbourhood: props.district,
+        road: props.street,
+        city: props.city,
+      }),
+      address: hay,
+      typeLabel: humanPlaceType(props.osm_value || props.type),
+      cuisine: cuisineFromType(props.osm_value),
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      providerLabel: "OpenStreetMap",
+      sources: props.osm_id
+        ? [`https://www.openstreetmap.org/${osmType}/${props.osm_id}`]
+        : [],
+      external: props.osm_id
+        ? { provider: "osm", id: `${props.osm_type}:${props.osm_id}` }
+        : null,
+    };
+  }
+
+  async function fetchOsmSuggestions(query, signal) {
+    const q = /coimbatore|kovai/i.test(query) ? query : `${query} Coimbatore`;
+    const nomUrl =
+      "https://nominatim.openstreetmap.org/search?" +
+      new URLSearchParams({
+        q,
+        format: "jsonv2",
+        addressdetails: "1",
+        extratags: "1",
+        limit: "6",
+        countrycodes: "in",
+        viewbox: "76.80,11.22,77.18,10.85",
+        bounded: "0",
+      });
+    const photonUrl =
+      "https://photon.komoot.io/api/?" +
+      new URLSearchParams({
+        q,
+        lat: String(CBE_CENTER.lat),
+        lon: String(CBE_CENTER.lng),
+        limit: "6",
+        lang: "en",
+        bbox: "76.80,10.85,77.18,11.22",
+      });
+    const [nomRes, photonRes] = await Promise.allSettled([
+      fetch(nomUrl, { signal, headers: { Accept: "application/json" } }),
+      fetch(photonUrl, { signal, headers: { Accept: "application/json" } }),
+    ]);
+    const items = [];
+    if (nomRes.status === "fulfilled" && nomRes.value.ok) {
+      const rows = await nomRes.value.json();
+      for (const row of rows) {
+        const item = nominatimToItem(row);
+        if (item && item.name) items.push(item);
+      }
+    }
+    if (photonRes.status === "fulfilled" && photonRes.value.ok) {
+      const data = await photonRes.value.json();
+      for (const feature of data.features || []) {
+        const item = photonToItem(feature);
+        if (item && item.name) items.push(item);
+      }
+    }
+    const seen = new Set();
+    return items.filter((item) => {
+      const coordKey =
+        typeof item.lat === "number" && typeof item.lng === "number"
+          ? `${item.lat.toFixed(3)},${item.lng.toFixed(3)}`
+          : item.external && item.external.id;
+      const key = `${nameKey(item.name)}|${coordKey || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  async function fetchRemoteSuggestions(query, signal) {
+    if (hasGoogleKey()) {
+      try {
+        const googleItems = await fetchGoogleAutocomplete(query, signal);
+        googleSessionError = "";
+        refreshPlacesProviderStatus();
+        return googleItems;
+      } catch (err) {
+        if (signal && signal.aborted) throw err;
+        googleSessionError = err.message || "request failed";
+        refreshPlacesProviderStatus();
+      }
+    }
+    return fetchOsmSuggestions(query, signal);
+  }
+
+  async function runPlaceLookup(query) {
+    const local = localPlaceSuggestions(query);
+    const usingGoogle = hasGoogleKey();
+    renderPlaceSuggest(local, {
+      loading: true,
+      providerHint: usingGoogle
+        ? "Google Places · Coimbatore"
+        : "OpenStreetMap · add a Google key for better matches",
+    });
+    if (suggestAbort) suggestAbort.abort();
+    suggestAbort = new AbortController();
+    const { signal } = suggestAbort;
+    try {
+      const remote = await fetchRemoteSuggestions(query, signal);
+      if (addName.value.trim() !== query) return;
+      renderPlaceSuggest(mergeSuggestionLists(local, remote), {
+        loading: false,
+        providerHint: hasGoogleKey()
+          ? "Google Places · Coimbatore"
+          : "OpenStreetMap · add a Google key for better matches",
+      });
+    } catch (err) {
+      if (signal.aborted) return;
+      renderPlaceSuggest(local, {
+        loading: false,
+        providerHint: `Lookup failed (${err.message}). You can still add this as a custom name.`,
+      });
+    }
+  }
+
+  function schedulePlaceLookup() {
+    const query = addName.value.trim();
+    suggestQuery = query;
+    if (query.length < 2) {
+      hidePlaceSuggest();
+      return;
+    }
+    const local = localPlaceSuggestions(query);
+    renderPlaceSuggest(local, {
+      loading: true,
+      providerHint: hasGoogleKey()
+        ? "Google Places · Coimbatore"
+        : "OpenStreetMap · add a Google key for better matches",
+    });
+    window.clearTimeout(suggestTimer);
+    suggestTimer = window.setTimeout(() => runPlaceLookup(query), 350);
+  }
+
+  async function choosePlaceSuggestion(item) {
+    if (item.kind === "local" && item.restaurant) {
+      jumpToPlace(item.restaurant);
+      return;
+    }
+    hidePlaceSuggest();
+    addName.value = item.name;
+    addArea.value = item.area || addArea.value;
+    addCuisine.value = item.cuisine || addCuisine.value;
+    let partial = {
+      name: item.name,
+      area: item.area || "",
+      cuisine: item.cuisine || "",
+      lat: item.lat,
+      lng: item.lng,
+      sources: item.sources || [],
+      external: item.external || null,
+      tags: ["added_by_you"],
+    };
+    if (item.provider === "google" && item.placeId && hasGoogleKey()) {
+      setStatus(`Looking up ${item.name}…`);
+      try {
+        const details = await fetchGooglePlaceDetails(item.placeId);
+        partial = {
+          ...partial,
+          ...details,
+          name: details.name || item.name,
+          cuisine: details.cuisine || item.cuisine || "",
+        };
+        if (details.googleRating != null) {
+          addGoogle.value = String(details.googleRating);
+          partial.googleRating = details.googleRating;
+        }
+        addName.value = partial.name;
+        addArea.value = partial.area || addArea.value;
+        addCuisine.value = partial.cuisine || addCuisine.value;
+      } catch (err) {
+        setStatus(`Couldn’t load Google details (${err.message}); adding with suggestion text.`, true);
+      }
+    }
+    const existing = findExistingPlace(partial);
+    if (existing) {
+      jumpToPlace(existing);
+      return;
+    }
+    commitCustomPlace(partial, { confirmDuplicate: false });
+  }
+
+  function addCustomPlace(event) {
+    event.preventDefault();
+    if (!placeSuggestList.hidden && suggestActive >= 0 && suggestItems[suggestActive]) {
+      choosePlaceSuggestion(suggestItems[suggestActive]);
+      return;
+    }
+    const name = addName.value.trim();
+    if (!name) {
+      setStatus("Name is required to add a place.", true);
+      addName.focus();
+      return;
+    }
+    commitCustomPlace(
+      {
+        name,
+        area: addArea.value.trim(),
+        cuisine: addCuisine.value.trim(),
+        googleRating: parseGoogleRating(addGoogle.value),
+        tags: ["added_by_you"],
+      },
+      { confirmDuplicate: true }
+    );
   }
 
   function bindUI() {
@@ -990,6 +1638,64 @@
     });
 
     addForm.addEventListener("submit", addCustomPlace);
+    addName.addEventListener("input", schedulePlaceLookup);
+    addName.addEventListener("focus", () => {
+      if (addName.value.trim().length >= 2) schedulePlaceLookup();
+    });
+    addName.addEventListener("keydown", (e) => {
+      if (placeSuggestList.hidden || !suggestItems.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        suggestActive = Math.min(suggestItems.length - 1, suggestActive + 1);
+        renderPlaceSuggest(suggestItems, {
+          providerHint: hasGoogleKey()
+            ? "Google Places · Coimbatore"
+            : "OpenStreetMap · add a Google key for better matches",
+        });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        suggestActive = Math.max(0, suggestActive - 1);
+        renderPlaceSuggest(suggestItems, {
+          providerHint: hasGoogleKey()
+            ? "Google Places · Coimbatore"
+            : "OpenStreetMap · add a Google key for better matches",
+        });
+      } else if (e.key === "Enter" && suggestActive >= 0) {
+        e.preventDefault();
+        choosePlaceSuggestion(suggestItems[suggestActive]);
+      } else if (e.key === "Escape") {
+        hidePlaceSuggest();
+      }
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".add-panel")) hidePlaceSuggest();
+    });
+    $("#btn-places-settings").addEventListener("click", () => {
+      const open = placesSettings.hidden;
+      placesSettings.hidden = !open;
+      $("#btn-places-settings").setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        refreshPlacesProviderStatus();
+        googleKeyInput.focus();
+      }
+    });
+    $("#btn-save-key").addEventListener("click", () => {
+      settings.googlePlacesApiKey = googleKeyInput.value.trim();
+      googleSessionError = "";
+      saveSettings();
+      setStatus(
+        settings.googlePlacesApiKey
+          ? "Google Places key saved in this browser. Suggestions will use Google when possible."
+          : "Cleared. Suggestions will use OpenStreetMap."
+      );
+    });
+    $("#btn-clear-key").addEventListener("click", () => {
+      googleKeyInput.value = "";
+      settings.googlePlacesApiKey = "";
+      googleSessionError = "";
+      saveSettings();
+      setStatus("Using OpenStreetMap for place suggestions.");
+    });
     $("#btn-suggest").addEventListener("click", pickSuggestions);
     $("#suggest-close").addEventListener("click", () => {
       suggestPanel.hidden = true;
@@ -1005,7 +1711,9 @@
 
   async function init() {
     loadState();
+    loadSettings();
     bindUI();
+    refreshPlacesProviderStatus();
     rebuildRestaurants();
     try {
       const res = await fetch("restaurants.json");
