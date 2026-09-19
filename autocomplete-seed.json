@@ -1,0 +1,67 @@
+{
+  "city": "Coimbatore",
+  "updated": "2026-09-19",
+  "notes": "Hand-checked Coimbatore dining places used as an autocomplete fallback when OpenStreetMap has no match. Every entry has a public source URL. Do not invent Google ratings, hours, or dishes. Coordinates are omitted unless a map pin was published on the cited page.",
+  "places": [
+    {
+      "id": "seed-the-asian-stories",
+      "name": "The Asian Stories",
+      "aliases": ["Asian Stories", "The Asian Stories Saibaba Colony"],
+      "area": "Saibaba Colony",
+      "address": "First Floor, No. 6, Bharathi Park 4th Cross Road, beside Jain Temple, Saibaba Colony, Coimbatore",
+      "cuisine": "Pan-Asian",
+      "type": "Restaurant",
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.zomato.com/coimbatore/the-asian-stories-saibaba-colony",
+        "https://www.swiggy.com/restaurants/coimbatore/sai-baba-colony/the-asian-stories-926542/dineout"
+      ]
+    },
+    {
+      "id": "seed-thats-y-food",
+      "name": "That's Y Food",
+      "aliases": ["Thats Y Food", "That's Y Food RS Puram"],
+      "area": "RS Puram",
+      "address": "24/49, T.V. Swamy Road East, opposite Emerald Building, RS Puram, Coimbatore",
+      "cuisine": "North Indian / Mughlai",
+      "type": "Restaurant",
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thatsyfoodcbe.in/",
+        "https://www.zomato.com/ThatsYFood"
+      ]
+    },
+    {
+      "id": "seed-ninhao",
+      "name": "Ninhao",
+      "aliases": ["Nin Hao", "Ninhao Chinese Restaurant", "Nin Hao Saibaba Colony"],
+      "area": "Saibaba Colony",
+      "address": "N.S.R. Road, near Karur Vysya Bank, Saibaba Colony, Coimbatore",
+      "cuisine": "Chinese / Pan-Asian",
+      "type": "Restaurant",
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://ninhaorestaurant.com/",
+        "https://www.zomato.com/coimbatore/nin-hao-saibaba-colony/info"
+      ]
+    },
+    {
+      "id": "seed-barbeque-nation-peelamedu",
+      "name": "Barbeque Nation (Fun Republic Mall)",
+      "aliases": ["Barbeque Nation", "BBQ Nation Coimbatore", "Barbeque Nation Peelamedu"],
+      "area": "Peelamedu",
+      "address": "Fun Republic Mall, Avinashi Road, near PSG Krishnammal College, Peelamedu, Coimbatore",
+      "cuisine": "North Indian / grill buffet",
+      "type": "Restaurant",
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.barbequenation.com/restaurants/coimbatore",
+        "https://www.zomato.com/coimbatore/barbeque-nation-peelamedu"
+      ]
+    }
+  ]
+}

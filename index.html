@@ -37,7 +37,7 @@
         <h2>Add to my list</h2>
         <p>Type a name — live Coimbatore suggestions appear as you type. Click one to add it, or keep a custom name if nothing matches.</p>
       </div>
-      <button type="button" class="btn btn-ghost btn-tiny" id="btn-places-settings" aria-expanded="false" aria-controls="places-settings">Places search</button>
+      <button type="button" class="btn btn-secondary btn-tiny" id="btn-places-settings" aria-expanded="false" aria-controls="places-settings">Places search / Google key</button>
     </div>
     <div id="places-settings" class="places-settings" hidden>
       <p class="settings-status" id="places-provider-status"></p>
@@ -50,7 +50,7 @@
         <button type="button" class="btn btn-ghost" id="btn-clear-key">Use OSM only</button>
       </div>
       <p class="settings-help">
-        Without a key, search uses OpenStreetMap (Nominatim + Photon), biased to Coimbatore.
+        OSM coverage is patchy (e.g. The Asian Stories is missing there). Without a key we use a verified Coimbatore seed list plus OpenStreetMap.
         For Google-quality autocomplete: in Google Cloud enable <strong>Places API (New)</strong>, create an API key,
         restrict it to HTTP referrers
         <code>https://adith847.github.io/*</code>,
@@ -80,6 +80,7 @@
       <button type="submit" class="btn btn-primary" id="btn-add">Add place</button>
     </form>
     <ul id="place-suggest-list" class="place-suggest" hidden role="listbox" aria-label="Place suggestions"></ul>
+    <p class="add-lookup-hint" id="add-lookup-hint"></p>
     <p class="suggest-live" id="place-suggest-live" aria-live="polite"></p>
     <datalist id="area-suggestions"></datalist>
     <datalist id="cuisine-suggestions"></datalist>

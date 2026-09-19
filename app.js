@@ -80,6 +80,8 @@
   let customPlaces = [];
   /** @type {Array<Object>} */
   let restaurants = [];
+  /** @type {Array<Object>} */
+  let autocompleteSeed = [];
   /** @type {Set<string>} */
   let visited = new Set();
   /** @type {Record<string, {rating:number|null, dishes:string[]}>} */
@@ -116,6 +118,7 @@
   const placesSettings = $("#places-settings");
   const googleKeyInput = $("#google-key");
   const placesProviderStatus = $("#places-provider-status");
+  const addLookupHint = $("#add-lookup-hint");
 
   let settings = { googlePlacesApiKey: "" };
   let googleSessionError = "";
@@ -187,10 +190,23 @@
       placesProviderStatus.textContent =
         "Using Google Places Autocomplete (New), biased to Coimbatore. Key stays in this browser only.";
     } else if (settings.googlePlacesApiKey && googleSessionError) {
-      placesProviderStatus.textContent = `Google key saved but requests failed (${googleSessionError}). Falling back to OpenStreetMap.`;
+      placesProviderStatus.textContent = `Google key saved but requests failed (${googleSessionError}). Falling back to the verified Coimbatore list + OpenStreetMap.`;
     } else {
       placesProviderStatus.textContent =
-        "Using OpenStreetMap (Nominatim + Photon) for Coimbatore matches. Add a Google key for better autocomplete.";
+        "No Google key — using the verified Coimbatore list + OpenStreetMap. Add a Places API (New) key for better live matches.";
+    }
+    if (addLookupHint) {
+      addLookupHint.innerHTML = hasGoogleKey()
+        ? "Live suggestions: your list, Google Places, and the verified Coimbatore index."
+        : `Live suggestions: your list + a verified Coimbatore index + OSM. <button type="button" class="hint-link" id="hint-open-places">Add a Google key</button> for Maps-quality matches (OSM often has gaps).`;
+      const hintBtn = $("#hint-open-places");
+      if (hintBtn) {
+        hintBtn.addEventListener("click", () => {
+          placesSettings.hidden = false;
+          $("#btn-places-settings").setAttribute("aria-expanded", "true");
+          googleKeyInput.focus();
+        });
+      }
     }
     if (googleKeyInput && googleKeyInput !== document.activeElement) {
       googleKeyInput.value = settings.googlePlacesApiKey;
@@ -981,6 +997,24 @@
       .trim();
   }
 
+  function nameMatchScore(query, name) {
+    const q = nameKey(query);
+    const n = nameKey(name);
+    if (!q || !n) return 0;
+    if (n === q) return 100;
+    if (n.startsWith(q) || n.includes(` ${q}`)) return 90;
+    if (n.includes(q) && q.length >= 4) return 80;
+    const qTokens = q.split(" ").filter((t) => t.length >= 2);
+    if (!qTokens.length) return 0;
+    const nTokens = n.split(" ");
+    const hits = qTokens.filter((t) =>
+      nTokens.some((nt) => nt === t || nt.startsWith(t))
+    );
+    if (hits.length === qTokens.length) return 75;
+    if (hits.length >= 1 && hits.length / qTokens.length >= 0.67) return 45;
+    return 0;
+  }
+
   function inCoimbatore(lat, lng, haystack) {
     const text = String(haystack || "").toLowerCase();
     if (/coimbatore|kovai|கோயம்புத்தூர்/.test(text)) return true;
@@ -1154,9 +1188,8 @@
   }
 
   function localPlaceSuggestions(query) {
-    const q = query.toLowerCase();
     return restaurants
-      .filter((r) => r.name.toLowerCase().includes(q))
+      .filter((r) => nameMatchScore(query, r.name) >= 70)
       .slice(0, 5)
       .map((r) => ({
         kind: "local",
@@ -1166,6 +1199,46 @@
         typeLabel: r.cuisine || "On your list",
         providerLabel: "Already on your list",
       }));
+  }
+
+  function seedPlaceSuggestions(query) {
+    return autocompleteSeed
+      .filter((p) => {
+        const names = [p.name, ...(Array.isArray(p.aliases) ? p.aliases : [])];
+        return names.some((nm) => nameMatchScore(query, nm) >= 70);
+      })
+      .filter((p) => !findExistingPlace({ name: p.name, external: { provider: "seed", id: p.id } }))
+      .slice(0, 5)
+      .map((p) => ({
+        kind: "seed",
+        provider: "seed",
+        name: p.name,
+        area: p.area || "",
+        address: p.address || "",
+        typeLabel: p.type || p.cuisine || "Restaurant",
+        cuisine: p.cuisine || "",
+        lat: typeof p.lat === "number" ? p.lat : null,
+        lng: typeof p.lng === "number" ? p.lng : null,
+        sources: Array.isArray(p.sources) ? p.sources : [],
+        providerLabel: "Verified",
+        external: { provider: "seed", id: p.id },
+      }));
+  }
+
+  function customAddItem(query) {
+    return {
+      kind: "custom",
+      name: query,
+      area: addArea.value.trim(),
+      cuisine: addCuisine.value.trim(),
+      typeLabel: "Custom place",
+      providerLabel: "Add as typed",
+    };
+  }
+
+  function suggestProviderHint() {
+    if (hasGoogleKey()) return "Google Places · Coimbatore";
+    return "OSM coverage is patchy — add a Google key for better matches";
   }
 
   function hidePlaceSuggest() {
@@ -1182,29 +1255,35 @@
     placeSuggestLive.textContent = "";
   }
 
-  function renderPlaceSuggest(items, { loading, providerHint } = {}) {
-    suggestItems = items;
-    if (suggestActive >= items.length) suggestActive = items.length - 1;
-    if (!items.length && !loading) {
-      placeSuggestList.hidden = true;
-      placeSuggestList.innerHTML = "";
-      addName.setAttribute("aria-expanded", "false");
-      placeSuggestLive.textContent = "No place suggestions";
-      return;
+  function renderPlaceSuggest(items, { loading, providerHint, query } = {}) {
+    const typed = (query || suggestQuery || addName.value).trim();
+    const rowsItems = [...items];
+    if (typed.length >= 2 && !rowsItems.some((item) => item.kind === "custom")) {
+      rowsItems.push(customAddItem(typed));
     }
+    suggestItems = rowsItems;
+    if (suggestActive >= rowsItems.length) suggestActive = rowsItems.length - 1;
+
     const head = `<li class="place-suggest-head" role="presentation">Is this the place?</li>`;
-    const rows = items
+    const rows = rowsItems
       .map((item, i) => {
-        const badge =
-          item.kind === "local"
-            ? `<span class="place-suggest-badge">On your list</span>`
-            : "";
-        const meta = [item.area, item.typeLabel, item.providerLabel]
-          .filter(Boolean)
-          .join(" · ");
+        let badge = "";
+        if (item.kind === "local") badge = `<span class="place-suggest-badge">On your list</span>`;
+        else if (item.kind === "seed") badge = `<span class="place-suggest-badge is-verified">Verified</span>`;
+        const title =
+          item.kind === "custom"
+            ? `Add “${item.name}” as a custom place`
+            : item.name;
+        const meta =
+          item.kind === "custom"
+            ? "Use the name you typed — area and cuisine optional"
+            : [item.area, item.typeLabel, item.providerLabel]
+                .filter(Boolean)
+                .join(" · ");
+        const extraClass = item.kind === "custom" ? " is-custom-add" : "";
         return `<li role="presentation">
-          <button type="button" class="place-suggest-item${i === suggestActive ? " is-active" : ""}" role="option" id="place-opt-${i}" data-index="${i}" aria-selected="${i === suggestActive ? "true" : "false"}">
-            <span class="place-suggest-name">${escapeHtml(item.name)} ${badge}</span>
+          <button type="button" class="place-suggest-item${extraClass}${i === suggestActive ? " is-active" : ""}" role="option" id="place-opt-${i}" data-index="${i}" aria-selected="${i === suggestActive ? "true" : "false"}">
+            <span class="place-suggest-name">${escapeHtml(title)} ${badge}</span>
             <span class="place-suggest-meta">${escapeHtml(meta)}</span>
           </button>
         </li>`;
@@ -1213,14 +1292,19 @@
     const footBits = [];
     if (loading) footBits.push("Searching Coimbatore…");
     if (providerHint) footBits.push(providerHint);
-    footBits.push("No match? Keep the name and click Add place for a custom entry.");
-    const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" · "))}</li>`;
+    if (!hasGoogleKey()) {
+      footBits.push("Add a Google Places key for better matches");
+    }
+    const cta = !hasGoogleKey()
+      ? `<button type="button" class="place-suggest-cta" id="suggest-open-key">Add a Google key</button>`
+      : "";
+    const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" · "))}${cta}</li>`;
     placeSuggestList.innerHTML = head + rows + foot;
     placeSuggestList.hidden = false;
     addName.setAttribute("aria-expanded", "true");
     placeSuggestLive.textContent = loading
       ? "Searching places"
-      : `${items.length} suggestion${items.length === 1 ? "" : "s"}`;
+      : `${rowsItems.length} suggestion${rowsItems.length === 1 ? "" : "s"}`;
     placeSuggestList.querySelectorAll(".place-suggest-item").forEach((btn) => {
       btn.addEventListener("mousedown", (e) => e.preventDefault());
       btn.addEventListener("click", () => {
@@ -1228,6 +1312,16 @@
         if (suggestItems[idx]) choosePlaceSuggestion(suggestItems[idx]);
       });
     });
+    const ctaBtn = $("#suggest-open-key");
+    if (ctaBtn) {
+      ctaBtn.addEventListener("mousedown", (e) => e.preventDefault());
+      ctaBtn.addEventListener("click", () => {
+        hidePlaceSuggest();
+        placesSettings.hidden = false;
+        $("#btn-places-settings").setAttribute("aria-expanded", "true");
+        googleKeyInput.focus();
+      });
+    }
   }
 
   function mergeSuggestionLists(local, remote) {
@@ -1240,6 +1334,32 @@
       if (key) seen.add(key);
     }
     return [...local, ...extra].slice(0, 8);
+  }
+
+  function isFoodishOsm(item) {
+    const blob = `${item.typeLabel || ""} ${item.cuisine || ""} ${item.extra || ""} ${item.name || ""}`.toLowerCase();
+    if (
+      /\b(restaurant|cafe|café|bar|pub|bakery|bistro|food court|fast food|ice cream|meal|kitchen|mess|dhaba)\b/.test(
+        blob
+      )
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function isJunkOsm(item) {
+    const blob = `${item.typeLabel || ""} ${item.extra || ""} ${item.name || ""}`.toLowerCase();
+    return /\b(supermarket|convenience|clothes|school|college|university|bank|hospital|parking|fuel|temple|place of worship|residential|hardware|electronics)\b/.test(
+      blob
+    ) || /\bstores?\b/.test(item.name || "");
+  }
+
+  function keepOsmSuggestion(item, query) {
+    const score = nameMatchScore(query, item.name);
+    if (score >= 70 && !isJunkOsm(item)) return true;
+    if (isFoodishOsm(item) && score >= 45) return true;
+    return false;
   }
 
   async function fetchGoogleAutocomplete(query, signal) {
@@ -1464,6 +1584,7 @@
     }
     const seen = new Set();
     return items.filter((item) => {
+      if (!keepOsmSuggestion(item, query)) return false;
       const coordKey =
         typeof item.lat === "number" && typeof item.lng === "number"
           ? `${item.lat.toFixed(3)},${item.lng.toFixed(3)}`
@@ -1493,12 +1614,11 @@
 
   async function runPlaceLookup(query) {
     const local = localPlaceSuggestions(query);
-    const usingGoogle = hasGoogleKey();
-    renderPlaceSuggest(local, {
+    const seed = seedPlaceSuggestions(query);
+    renderPlaceSuggest(mergeSuggestionLists(local, seed), {
       loading: true,
-      providerHint: usingGoogle
-        ? "Google Places · Coimbatore"
-        : "OpenStreetMap · add a Google key for better matches",
+      providerHint: suggestProviderHint(),
+      query,
     });
     if (suggestAbort) suggestAbort.abort();
     suggestAbort = new AbortController();
@@ -1506,17 +1626,17 @@
     try {
       const remote = await fetchRemoteSuggestions(query, signal);
       if (addName.value.trim() !== query) return;
-      renderPlaceSuggest(mergeSuggestionLists(local, remote), {
+      renderPlaceSuggest(mergeSuggestionLists(local, [...seed, ...remote]), {
         loading: false,
-        providerHint: hasGoogleKey()
-          ? "Google Places · Coimbatore"
-          : "OpenStreetMap · add a Google key for better matches",
+        providerHint: suggestProviderHint(),
+        query,
       });
     } catch (err) {
       if (signal.aborted) return;
-      renderPlaceSuggest(local, {
+      renderPlaceSuggest(mergeSuggestionLists(local, seed), {
         loading: false,
         providerHint: `Lookup failed (${err.message}). You can still add this as a custom name.`,
+        query,
       });
     }
   }
@@ -1529,11 +1649,11 @@
       return;
     }
     const local = localPlaceSuggestions(query);
-    renderPlaceSuggest(local, {
+    const seed = seedPlaceSuggestions(query);
+    renderPlaceSuggest(mergeSuggestionLists(local, seed), {
       loading: true,
-      providerHint: hasGoogleKey()
-        ? "Google Places · Coimbatore"
-        : "OpenStreetMap · add a Google key for better matches",
+      providerHint: suggestProviderHint(),
+      query,
     });
     window.clearTimeout(suggestTimer);
     suggestTimer = window.setTimeout(() => runPlaceLookup(query), 350);
@@ -1542,6 +1662,20 @@
   async function choosePlaceSuggestion(item) {
     if (item.kind === "local" && item.restaurant) {
       jumpToPlace(item.restaurant);
+      return;
+    }
+    if (item.kind === "custom") {
+      hidePlaceSuggest();
+      commitCustomPlace(
+        {
+          name: item.name,
+          area: addArea.value.trim() || item.area || "",
+          cuisine: addCuisine.value.trim() || item.cuisine || "",
+          googleRating: parseGoogleRating(addGoogle.value),
+          tags: ["added_by_you"],
+        },
+        { confirmDuplicate: true }
+      );
       return;
     }
     hidePlaceSuggest();
@@ -1648,17 +1782,15 @@
         e.preventDefault();
         suggestActive = Math.min(suggestItems.length - 1, suggestActive + 1);
         renderPlaceSuggest(suggestItems, {
-          providerHint: hasGoogleKey()
-            ? "Google Places · Coimbatore"
-            : "OpenStreetMap · add a Google key for better matches",
+          providerHint: suggestProviderHint(),
+          query: addName.value.trim(),
         });
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         suggestActive = Math.max(0, suggestActive - 1);
         renderPlaceSuggest(suggestItems, {
-          providerHint: hasGoogleKey()
-            ? "Google Places · Coimbatore"
-            : "OpenStreetMap · add a Google key for better matches",
+          providerHint: suggestProviderHint(),
+          query: addName.value.trim(),
         });
       } else if (e.key === "Enter" && suggestActive >= 0) {
         e.preventDefault();
@@ -1721,6 +1853,15 @@
       const data = await res.json();
       curated = Array.isArray(data) ? data : data.restaurants || [];
       if (curated.length === 0) throw new Error("No restaurants in JSON");
+      try {
+        const seedRes = await fetch("autocomplete-seed.json");
+        if (seedRes.ok) {
+          const seedData = await seedRes.json();
+          autocompleteSeed = Array.isArray(seedData) ? seedData : seedData.places || [];
+        }
+      } catch {
+        autocompleteSeed = [];
+      }
       rebuildRestaurants();
       refreshFilterOptions();
       updateStats();

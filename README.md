@@ -49,8 +49,10 @@ Custom places merge with the curated 47; they never overwrite `restaurants.json`
 The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil Nadu.
 
 1. **Already on your list** — curated + custom names match first. Clicking jumps to that card instead of duplicating it (e.g. **The Living Room**).
-2. **Google Places Autocomplete (New)** — if you save an API key in **Places search**. Place Details may pre-fill area, coordinates, a Google ★, and a Maps link *only when Google returns those fields*.
-3. **OpenStreetMap fallback** — Nominatim + Photon, biased to Coimbatore, when no key is set (or Google requests fail). Coverage is thinner than Google; a short hint in settings explains that.
+2. **Google Places Autocomplete (New)** — if you save an API key in **Places search / Google key**. Place Details may pre-fill area, coordinates, a Google ★, and a Maps link *only when Google returns those fields*.
+3. **Verified Coimbatore index** (`autocomplete-seed.json`) — attributed local dining spots OSM often lacks (e.g. **The Asian Stories**, Saibaba Colony). No invented ratings/hours/dishes.
+4. **OpenStreetMap** — Nominatim + Photon, food-filtered and name-matched. Junk “stores” fuzzy hits are dropped.
+5. **Never silent-empty** — queries of 2+ characters always show a dropdown, including **Add “{name}” as a custom place** when nothing else matches, plus a Google-key CTA if none is saved.
 
 ### How Adi adds a Google key (optional)
 
@@ -69,7 +71,7 @@ Do this in [Google Cloud Console](https://console.cloud.google.com/). Never past
    - **API restrictions → Restrict key → Places API (New)**
 5. Open the picker → **Places search** → paste the key → **Save key**. It is stored as `cbe-picker-settings-v1` in `localStorage` on that machine/browser only.
 
-Without a key, type a known Kovai name (e.g. Starbucks, Haribhavanam, Sree Annapoorna) and OSM suggestions should still appear. You can always click **Add place** with a custom name if nothing matches.
+Without a key, type **Asian Stories** — it should suggest The Asian Stories (Saibaba Colony) from the verified index, not fail silently. You can always choose **Add “…” as a custom place** if nothing matches.
 
 ## Files
 
@@ -79,6 +81,7 @@ Without a key, type a known Kovai name (e.g. Starbucks, Haribhavanam, Sree Annap
 | `styles.css` | Warm food-app styling |
 | `app.js` | Filters, localStorage, add/autocomplete/rate/dishes, suggest, geolocation, import/export |
 | `restaurants.json` | 47 Coimbatore restaurants (do not invent extra places, hours, dishes, or numeric Google ratings) |
+| `autocomplete-seed.json` | Verified Coimbatore dining fallback for autocomplete (public sources only) |
 
 ## Repo notes
 

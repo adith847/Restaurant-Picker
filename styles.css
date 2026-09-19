@@ -353,6 +353,44 @@ h1 {
   vertical-align: middle;
 }
 
+.add-lookup-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.hint-link,
+.place-suggest-cta {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--terracotta-deep);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.place-suggest-cta {
+  display: inline-block;
+  margin-left: 0.35rem;
+}
+
+.place-suggest-badge.is-verified {
+  background: #d7e4d4;
+  color: var(--sage);
+}
+
+.place-suggest-item.is-custom-add {
+  border-top: 1px dashed var(--border);
+  margin-top: 0.15rem;
+}
+
+.place-suggest-item.is-custom-add .place-suggest-name {
+  color: var(--terracotta-deep);
+}
+
 .suggest-live {
   position: absolute;
   width: 1px;
