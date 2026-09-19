@@ -1,0 +1,866 @@
+{
+  "city": "Coimbatore",
+  "updated": "2026-09-19",
+  "restaurants": [
+    {
+      "id": "kove",
+      "name": "Kove (by Annapoorna)",
+      "area": "RS Puram",
+      "cuisine": "Progressive vegetarian / global fusion",
+      "price": "₹₹₹₹",
+      "blurb": "Coimbatore’s standout progressive-veg fine diner with tasting menus, inventively Indianised global dishes and craft cocktails, frequently cited by NDTV Food and travellers as the city’s top upscale vegetarian experience.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "vegetarian"
+      ],
+      "lat": 11.0069,
+      "lng": 76.9516,
+      "sources": [
+        "https://www.koverestaurant.com/",
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430"
+      ]
+    },
+    {
+      "id": "afghan-grill",
+      "name": "Afghan Grill",
+      "area": "Avinashi Road (The Residency Towers)",
+      "cuisine": "North Indian / kebabs & biryani",
+      "price": "₹₹₹₹",
+      "blurb": "Poolside alfresco grill at The Residency Towers, covered by The Hindu (2025) for Lucknowi galouti kebabs, elaborate marinations and signature cocktails.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "hotel"
+      ],
+      "lat": 11.0101,
+      "lng": 76.9805,
+      "sources": [
+        "https://www.thehindu.com/food/dining/an-alfresco-dining-experience-by-the-poolside-in-coimbatore/article69682386.ece",
+        "https://www.theresidency.com/towers-coimbatore/dining.html"
+      ]
+    },
+    {
+      "id": "chin-chin",
+      "name": "Chin Chin",
+      "area": "Avinashi Road (The Residency Towers)",
+      "cuisine": "Pan-Asian",
+      "price": "₹₹₹₹",
+      "blurb": "Long-running Residency Towers Pan-Asian restaurant refreshed in 2025 with dim sum, sushi, Korean bowls and hibachi, still anchored by legacy favourites.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "hotel"
+      ],
+      "lat": 11.0101,
+      "lng": 76.9805,
+      "sources": [
+        "https://www.thehindu.com/food/dining/coimbatores-chin-chin-adds-dim-sum-tempuras-sushi-and-korean-bowls-with-a-local-spin/article69936048.ece",
+        "https://www.theresidency.com/towers-coimbatore/dining.html"
+      ]
+    },
+    {
+      "id": "pavilion",
+      "name": "Pavilion",
+      "area": "Avinashi Road (The Residency Towers)",
+      "cuisine": "Multi-cuisine",
+      "price": "₹₹₹",
+      "blurb": "All-day dining restaurant at The Residency Towers with buffet and à la carte national and international menus, a reliable hotel dining staple near the city centre.",
+      "tags": [
+        "highly_rated",
+        "hotel",
+        "multi_cuisine"
+      ],
+      "lat": 11.0101,
+      "lng": 76.9805,
+      "sources": [
+        "https://www.theresidency.com/towers-coimbatore/dining/pavilion.html",
+        "https://www.theresidency.com/towers-coimbatore/dining.html"
+      ]
+    },
+    {
+      "id": "the-edition-bar",
+      "name": "The Edition Bar",
+      "area": "Avinashi Road (The Residency Towers)",
+      "cuisine": "Bar food / finger food",
+      "price": "₹₹₹",
+      "blurb": "Library-style bar at The Residency Towers for quiet cocktails and small plates, consistently listed among the hotel’s upscale nightlife options.",
+      "tags": [
+        "highly_rated",
+        "bar",
+        "hotel"
+      ],
+      "lat": 11.0101,
+      "lng": 76.9805,
+      "sources": [
+        "https://www.theresidency.com/towers-coimbatore/dining/the-edition-bar.html",
+        "https://www.theresidency.com/towers-coimbatore/dining.html"
+      ]
+    },
+    {
+      "id": "bikes-and-barrels",
+      "name": "Bike & Barrel",
+      "area": "Avinashi Road (The Residency Towers)",
+      "cuisine": "Pub / multi-cuisine",
+      "price": "₹₹₹",
+      "blurb": "English-themed pub at The Residency Towers for drinks, music and hearty pub fare; also appears on Zomato Race Course dining lists as Bikes & Barrels.",
+      "tags": [
+        "highly_rated",
+        "bar",
+        "hotel"
+      ],
+      "lat": 11.0101,
+      "lng": 76.9805,
+      "sources": [
+        "https://www.theresidency.com/towers-coimbatore/dining.html",
+        "https://www.zomato.com/coimbatore/best-race-course-restaurants"
+      ]
+    },
+    {
+      "id": "sazz-kitchen-lounge",
+      "name": "Sazz Kitchen & Lounge",
+      "area": "Ukkadam / Selvapuram Bypass",
+      "cuisine": "Global fusion / Asian–Continental",
+      "price": "₹₹₹",
+      "blurb": "Large experience-led kitchen and lounge profiled by The Hindu (2026) for sushi, ramen, kebabs and slow-cooked dishes from a chef with Michelin-kitchen experience.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/a-celebration-of-global-cuisines-under-one-roof/article71036087.ece",
+        "https://www.zomato.com/coimbatore/sazz-kitchen-lounge-ukkadam/reviews"
+      ]
+    },
+    {
+      "id": "welcomcafe-kovai",
+      "name": "WelcomCafe Kovai",
+      "area": "Race Course (Welcomhotel by ITC)",
+      "cuisine": "Multi-cuisine / regional Indian",
+      "price": "₹₹₹",
+      "blurb": "ITC Welcomhotel’s all-day diner praised by NDTV Food and TripAdvisor travellers for buffet/à la carte spreads with strong South Indian and Kongu regional dishes.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "hotel",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://www.tripadvisor.in/Restaurant_Review-g297675-d13148547-Reviews-WelcomCafe_Kovai-Coimbatore_Coimbatore_District_Tamil_Nadu.html"
+      ]
+    },
+    {
+      "id": "bird-on-tree",
+      "name": "Bird on Tree",
+      "area": "Race Course",
+      "cuisine": "Multi-cuisine (Indian, European, Chinese)",
+      "price": "₹₹₹",
+      "blurb": "Photogenic Race Course fine diner with rooftop/outdoor seating, long listed by NDTV Food and The Hindu for European and North Indian signatures.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://www.thehindu.com/features/metroplus/Feeling-peckish/article16091725.ece"
+      ]
+    },
+    {
+      "id": "chocko-choza",
+      "name": "Chocko Choza",
+      "area": "Race Course",
+      "cuisine": "Resto-café / global & South Indian",
+      "price": "₹₹₹",
+      "blurb": "Race Course resto-café from the single-origin chocolate brand, covered by The Hindu (2025) for preservative-free breads, pizzas, South Indian plates and hot chocolate.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/coimbatores-chocko-choza-opens-a-new-resto-cafe-serving-global-and-south-indian-food/article69436826.ece"
+      ]
+    },
+    {
+      "id": "the-french-door",
+      "name": "The French Door",
+      "area": "RS Puram",
+      "cuisine": "Café / European",
+      "price": "₹₹₹",
+      "blurb": "Intimate RS Puram café-restaurant behind a celebrated antique Pondicherry door, noted by NDTV Food for house-baked breads and farm-sourced ingredients.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thefrenchdoorindia.com/",
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430"
+      ]
+    },
+    {
+      "id": "annalakshmi",
+      "name": "Annalakshmi Vegetarian Fine Dining",
+      "area": "Race Course",
+      "cuisine": "South Indian vegetarian",
+      "price": "₹₹",
+      "blurb": "Kalakshetra/Shivanjali-linked vegetarian dining room known for home-style Tamil meals served with quiet hospitality; a Race Course institution on TripAdvisor and local listings.",
+      "tags": [
+        "fine_dining",
+        "highly_rated",
+        "vegetarian"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/features/metroplus/Food/annalakshmi-reaffirms-its-commitment-to-serve-food-with-love/article6435371.ece",
+        "https://www.district.in/dining/coimbatore/annalakshmi-vegetarian-fine-dining-race-course"
+      ]
+    },
+    {
+      "id": "valarmathi-mess",
+      "name": "Valarmathi Mess",
+      "area": "Race Course",
+      "cuisine": "Kongunadu non-vegetarian",
+      "price": "₹₹",
+      "blurb": "No-frills Race Course mess (est. 1986) celebrated by The Hindu and The News Minute for Pichu Pota Kozhi and other Kongu meat classics with deep local following.",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/features/coimbatore-race-course-road-valarmathi-mess-richie-rich/article69271220.ece",
+        "https://www.thenewsminute.com/tamil-nadu/magicians-meat-coimbatores-valarmathi-mess-serves-delicacies-kongu-heartland-41197"
+      ]
+    },
+    {
+      "id": "cafe-totaram",
+      "name": "Café Totaram",
+      "area": "Race Course",
+      "cuisine": "Café / desserts & comfort food",
+      "price": "₹₹",
+      "blurb": "Race Course café highlighted in The Hindu’s 2025 food walk for soufflés and a welcoming literary vibe from the On The Go / All Rise founders.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/features/coimbatore-race-course-road-valarmathi-mess-richie-rich/article69271220.ece",
+        "https://cafetotaram.com/contact/"
+      ]
+    },
+    {
+      "id": "haribhavanam-goldwins",
+      "name": "Haribhavanam (Goldwins)",
+      "area": "Peelamedu / Goldwins (Avinashi Road)",
+      "cuisine": "Tamil Nadu / Kongunadu non-vegetarian",
+      "price": "₹₹",
+      "blurb": "NDTV Food pick for Kongunad specialties such as Pallipalayam chicken in a polished non-veg setting along the Avinashi Road corridor.",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://haribhavanam.com/pages/about"
+      ]
+    },
+    {
+      "id": "favola",
+      "name": "Favola",
+      "area": "Neelambur (Le Méridien)",
+      "cuisine": "Italian",
+      "price": "₹₹₹₹",
+      "blurb": "Le Méridien’s signature Italian restaurant, positioned by the hotel as Coimbatore’s dedicated fine-Italian dining room near the airport.",
+      "tags": [
+        "fine_dining",
+        "hotel"
+      ],
+      "lat": 11.0591,
+      "lng": 77.0749,
+      "sources": [
+        "https://www.marriott.com/en-us/hotels/cjbmd-le-meridien-coimbatore/dining/",
+        "https://www.tripadvisor.com/Restaurants-g297675-Coimbatore_Coimbatore_District_Tamil_Nadu.html"
+      ]
+    },
+    {
+      "id": "ponzu",
+      "name": "Ponzu",
+      "area": "Neelambur (Le Méridien)",
+      "cuisine": "Pan-Asian",
+      "price": "₹₹₹₹",
+      "blurb": "Le Méridien’s Pan-Asian restaurant spanning Japanese, Chinese, Thai and Mongolian flavours; appears on TripAdvisor’s Coimbatore fine-dining shortlists.",
+      "tags": [
+        "fine_dining",
+        "hotel"
+      ],
+      "lat": 11.0591,
+      "lng": 77.0749,
+      "sources": [
+        "https://www.marriott.com/en-us/hotels/cjbmd-le-meridien-coimbatore/dining/",
+        "https://www.zomato.com/coimbatore/ponzu-le-meridien-neelambur/menu"
+      ]
+    },
+    {
+      "id": "peacock-le-meridien",
+      "name": "Peacock",
+      "area": "Neelambur (Le Méridien)",
+      "cuisine": "North & South Indian",
+      "price": "₹₹₹₹",
+      "blurb": "Le Méridien’s dedicated Indian restaurant for North and South specialties, part of the hotel’s upscale dining cluster near the airport.",
+      "tags": [
+        "fine_dining",
+        "hotel"
+      ],
+      "lat": 11.0591,
+      "lng": 77.0749,
+      "sources": [
+        "https://www.marriott.com/en-us/hotels/cjbmd-le-meridien-coimbatore/dining/"
+      ]
+    },
+    {
+      "id": "latest-recipe",
+      "name": "Latest Recipe",
+      "area": "Neelambur (Le Méridien)",
+      "cuisine": "Multi-cuisine",
+      "price": "₹₹₹",
+      "blurb": "24-hour all-day dining restaurant at Le Méridien with buffet and à la carte; frequently ranks near the top of TripAdvisor’s Coimbatore restaurant charts.",
+      "tags": [
+        "highly_rated",
+        "hotel",
+        "multi_cuisine"
+      ],
+      "lat": 11.0591,
+      "lng": 77.0749,
+      "sources": [
+        "https://www.marriott.com/en-us/hotels/cjbmd-le-meridien-coimbatore/dining/",
+        "https://www.tripadvisor.com/Restaurants-g297675-Coimbatore_Coimbatore_District_Tamil_Nadu.html"
+      ]
+    },
+    {
+      "id": "kovai-kitchen",
+      "name": "Kovai Kitchen",
+      "area": "Airport Road (Fairfield by Marriott)",
+      "cuisine": "Multi-cuisine / local & global comfort food",
+      "price": "₹₹₹",
+      "blurb": "Stylish all-day diner at Fairfield by Marriott near the airport, Travellers’ Choice–level TripAdvisor favourite for buffets with local Tamil and global comfort dishes.",
+      "tags": [
+        "highly_rated",
+        "hotel",
+        "multi_cuisine"
+      ],
+      "lat": 11.0356,
+      "lng": 77.0373,
+      "sources": [
+        "https://www.tripadvisor.ca/Restaurant_Review-g297675-d14942081-Reviews-Kovai_Kitchen-Coimbatore_Coimbatore_District_Tamil_Nadu.html"
+      ]
+    },
+    {
+      "id": "the-great-kabab-factory",
+      "name": "The Great Kabab Factory",
+      "area": "Peelamedu (Radisson Blu)",
+      "cuisine": "North Indian / Mughlai kebabs",
+      "price": "₹₹₹₹",
+      "blurb": "Signature kebab restaurant at Radisson Blu on Avinashi Road, part of the national Great Kabab Factory brand focused on Awadhi-style grills and thalis.",
+      "tags": [
+        "fine_dining",
+        "hotel"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.district.in/dining/coimbatore/the-great-kabab-factory-radisson-blu-peelamedu",
+        "https://www.zomato.com/coimbatore/the-great-kabab-factory-radisson-blu-peelamedu/info"
+      ]
+    },
+    {
+      "id": "la-cabana",
+      "name": "La Cabana",
+      "area": "Ram Nagar (Park Elanza)",
+      "cuisine": "Multi-cuisine / rooftop bar",
+      "price": "₹₹₹",
+      "blurb": "Rooftop restaurant at Hotel Park Elanza, singled out by NDTV Food for alfresco dining, tandoori starters and cocktails with Western Ghats views.",
+      "tags": [
+        "highly_rated",
+        "rooftop",
+        "hotel"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://www.parkelanza.com/coimbatore/dining/la-cabana.html"
+      ]
+    },
+    {
+      "id": "infusions",
+      "name": "Infusions (Café Infusions)",
+      "area": "Ram Nagar",
+      "cuisine": "Café / fusion & chocolate desserts",
+      "price": "₹₹",
+      "blurb": "Award-leaning café by chocolatier Arun Viswanathan, known on TripAdvisor for fusion savoury plates and cocoa-forward desserts and hot chocolates.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.tripadvisor.ca/Restaurant_Review-g297675-d15679652-Reviews-Infusions-Coimbatore_Coimbatore_District_Tamil_Nadu.html"
+      ]
+    },
+    {
+      "id": "bulls-and-bears-bistro",
+      "name": "Bulls & Bears Bistro",
+      "area": "RS Puram",
+      "cuisine": "Continental / Italian café",
+      "price": "₹₹",
+      "blurb": "Popular RS Puram bistro for Continental and Italian café fare; regularly tops Zomato Race Course/RS Puram dining lists with strong diner scores.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": 11.0091,
+      "lng": 76.951,
+      "sources": [
+        "https://www.zomato.com/coimbatore/bulls-bears-bistro-rs-puram",
+        "https://www.zomato.com/coimbatore/best-race-course-restaurants"
+      ]
+    },
+    {
+      "id": "the-living-room",
+      "name": "The Living Room",
+      "area": "Peelamedu",
+      "cuisine": "Multi-cuisine resto-bar",
+      "price": "₹₹₹",
+      "blurb": "Avinashi Road resto-bar covered by The Hindu for soul food, craft cocktails and 90s music, with Kongu and pan-Asian plates in a lively Peelamedu setting.",
+      "tags": [
+        "highly_rated",
+        "multi_cuisine",
+        "bar"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/coimbatores-new-restobar-raises-a-toast-to-soul-food-90s-music-and-crafted-cocktails/article67621014.ece",
+        "https://www.district.in/dining/coimbatore/the-living-room-peelamedu"
+      ]
+    },
+    {
+      "id": "bizou-cafe-grill",
+      "name": "Bizou Café & Grill",
+      "area": "Saibaba Colony",
+      "cuisine": "European café & grill",
+      "price": "₹₹₹",
+      "blurb": "Saibaba Colony café-grill with an active official site, focused on Continental plates, grilled meats and specialty coffee in an elegant setting.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://bizoucafe.com/"
+      ]
+    },
+    {
+      "id": "cream-centre",
+      "name": "Cream Centre",
+      "area": "Race Course",
+      "cuisine": "Vegetarian multi-cuisine",
+      "price": "₹₹",
+      "blurb": "Long-running vegetarian multi-cuisine brand outlet on Race Course, well rated on Zomato for Indian, Italian and Mexican vegetarian dining.",
+      "tags": [
+        "highly_rated",
+        "vegetarian",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.zomato.com/coimbatore/rs-puram-restaurants?all=1&delivery_subzone=2773&veg=1",
+        "https://www.zomato.com/coimbatore/best-race-course-restaurants"
+      ]
+    },
+    {
+      "id": "sree-annapoorna-rs-puram",
+      "name": "Sree Annapoorna (RS Puram)",
+      "area": "RS Puram",
+      "cuisine": "South Indian vegetarian",
+      "price": "₹",
+      "blurb": "Coimbatore’s defining vegetarian institution (since the 1960s), singled out by NDTV Food for ghee roast dosa, pongal–vada and filter coffee, with Travellers’ Choice–level TripAdvisor standing at the East Arokiasamy Road flagship.",
+      "tags": [
+        "highly_rated",
+        "vegetarian",
+        "local_classic"
+      ],
+      "lat": 11.0068,
+      "lng": 76.9517,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://www.tripadvisor.in/Restaurant_Review-g297675-d1640747-Reviews-Shree_Annapoorna-Coimbatore_Coimbatore_District_Tamil_Nadu.html"
+      ]
+    },
+    {
+      "id": "shree-anandhaas-lakshmi-mills",
+      "name": "Shree Anandhaas (Lakshmi Mills)",
+      "area": "Lakshmi Mills / Puliakulam",
+      "cuisine": "South Indian vegetarian",
+      "price": "₹",
+      "blurb": "Homegrown pure-veg chain on NDTV Food’s Coimbatore shortlist for coriander pongal, rava kesari, filter coffee and palm-jaggery Mysore pak from the attached sweet shop.",
+      "tags": [
+        "highly_rated",
+        "vegetarian",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://shreeanandhaas.com/"
+      ]
+    },
+    {
+      "id": "junior-kuppanna-peelamedu",
+      "name": "Hotel Junior Kuppanna (Peelamedu)",
+      "area": "Peelamedu (Avinashi Road)",
+      "cuisine": "Tamil Nadu / Kongunadu non-vegetarian",
+      "price": "₹₹",
+      "blurb": "Erode-origin non-veg brand outlet on Avinashi Road, consistently high on TripAdvisor/Zomato for spicy biryani and pepper chicken in a busy family dining setting.",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.tripadvisor.com/Restaurant_Review-g297675-d3484957-Reviews-Junior_Kuppanna-Coimbatore_Coimbatore_District_Tamil_Nadu.html",
+        "https://www.zomato.com/coimbatore/hotel-junior-kuppanna-peelamedu"
+      ]
+    },
+    {
+      "id": "hotel-kannappa-goldwins",
+      "name": "Hotel Kannappa (Goldwins)",
+      "area": "Goldwins (Avinashi Road)",
+      "cuisine": "Chettinad / South Indian non-vegetarian",
+      "price": "₹₹",
+      "blurb": "High-volume Chettinad and dum-biryani specialist (est. 2002) on Avinashi Road Goldwins, backed by an active brand site and very large Google review volume for seafood and mutton classics.",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": 11.0442,
+      "lng": 77.0458,
+      "sources": [
+        "https://hotelkannappa.com/",
+        "https://www.district.in/dining/coimbatore/hotel-kannappa-sitra"
+      ]
+    },
+    {
+      "id": "anandass-chettynadu",
+      "name": "Anandass Chettynadu Unavu Viduthi",
+      "area": "Gopalapuram (State Bank Road)",
+      "cuisine": "Chettinad",
+      "price": "₹₹",
+      "blurb": "Long-running Gopalapuram Chettinad mess (local lore from the 1960s) still listed and reviewed for home-style chicken biryani, mutton chukka, fish fry and non-veg meals opposite the Collector Office.",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://yappe.in/tamil-nadu/coimbatore/anandass-chettynadu-unavu-viduthi/33931",
+        "https://restaurant-guru.in/Anandass-Chettynadu-Unavu-Viduthi-Coimbatore"
+      ]
+    },
+    {
+      "id": "put-kadalai",
+      "name": "Put Kadalai",
+      "area": "Race Course",
+      "cuisine": "Café / local-inspired fusion",
+      "price": "₹₹",
+      "blurb": "Peanut-themed all-day Race Course café profiled by The Hindu (Oct 2025) for kadalai mittai French toast, chicken curryza, karuppatti shakes and seasonal local ingredients.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/a-peanut-themed-cafe-in-coimbatore-celebrates-home-grown-flavours/article70193023.ece",
+        "https://www.zomato.com/coimbatore/put-kadalai-1-race-course"
+      ]
+    },
+    {
+      "id": "melt-and-mingle",
+      "name": "Melt and Mingle",
+      "area": "Peelamedu",
+      "cuisine": "Café / chocolate desserts",
+      "price": "₹₹",
+      "blurb": "Peelamedu couverture-chocolate café covered by The Hindu (2025) for luxury hot chocolate, skillet cookies and seasonal fruit-forward desserts.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/melt-and-mingle-cafe-in-coimbatore-specialises-in-chocolate-based-desserts/article69689767.ece"
+      ]
+    },
+    {
+      "id": "jade-broadway",
+      "name": "Jade",
+      "area": "Sitra / Broadway Mall (Avinashi Road)",
+      "cuisine": "Contemporary Indian",
+      "price": "₹₹₹",
+      "blurb": "Broadway Mall contemporary Indian dining room profiled by The Hindu (2025) for North–South comfort plates such as kizhi parotta platters and playful desserts in a cinematic 60-seater.",
+      "tags": [
+        "highly_rated",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/jade-at-coimbatores-broadway-mall-reimagines-indian-flavours-for-the-modern-palate/article69661746.ece",
+        "https://www.zomato.com/coimbatore/jade-sitra/info"
+      ]
+    },
+    {
+      "id": "warehouse-kalapatti",
+      "name": "Warehouse",
+      "area": "Kalapatti (Sitra Road)",
+      "cuisine": "Kongu / restobar",
+      "price": "₹₹₹",
+      "blurb": "Kalapatti restobar covered by The Hindu for inventive Kongu twists (Pallipalayam fritters, elanthari kozhi roast) with creative cocktails in a bohemian Goan-leaning setting.",
+      "tags": [
+        "highly_rated",
+        "bar",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/coimbatores-warehouse-restobar-offers-a-delightful-twist-of-kongu-dishes-in-goan-vibes/article68794801.ece",
+        "https://www.zomato.com/coimbatore/warehouse-kalapatti"
+      ]
+    },
+    {
+      "id": "on-the-go",
+      "name": "On The Go",
+      "area": "Race Course",
+      "cuisine": "Multi-cuisine / Continental & North Indian",
+      "price": "₹₹₹",
+      "blurb": "Race Course staple since 2010 (same founders as Café Totaram), with an official site and strong Zomato dining scores for North Indian, Italian and European comfort plates.",
+      "tags": [
+        "highly_rated",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://onthegocbe.in/",
+        "https://www.zomato.com/coimbatore/on-the-go-race-course"
+      ]
+    },
+    {
+      "id": "richie-rich",
+      "name": "Richie Rich",
+      "area": "Race Course",
+      "cuisine": "Ice cream / desserts & snacks",
+      "price": "₹",
+      "blurb": "Race Course ice-cream parlour with a 1977 lineage, highlighted in The Hindu’s 2025 food walk for Ferrero Rocher ice cream with dark-chocolate sauce.",
+      "tags": [
+        "highly_rated",
+        "cafe",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/features/coimbatore-race-course-road-valarmathi-mess-richie-rich/article69271220.ece",
+        "https://www.zomato.com/coimbatore/richy-rich-race-course"
+      ]
+    },
+    {
+      "id": "little-soi",
+      "name": "Little Soi",
+      "area": "Lakshmi Mills (Avinashi Road)",
+      "cuisine": "Asian street food",
+      "price": "₹₹₹",
+      "blurb": "Lakshmi Mills Urban Center Asian street-food room reviewed by The Hindu (2024) for dim sum, buldak chicken, orange chicken bao, khao suey and Lotus Biscoff cheesecake.",
+      "tags": [
+        "highly_rated",
+        "multi_cuisine"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/little-soi-in-coimbatore-offers-an-interesting-array-of-asian-street-food/article68980358.ece"
+      ]
+    },
+    {
+      "id": "britain-to-bombay-1800",
+      "name": "Britain to Bombay 1800",
+      "area": "RS Puram",
+      "cuisine": "Café / Western comfort",
+      "price": "₹₹",
+      "blurb": "RS Puram café repeatedly covered by The Hindu (including a July 2026 menu refresh) for thin-crust pizzas, steaks, burgers, rice bowls and standout tiramisu/tres leches.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/from-godfather-pizza-to-tres-leches-coimbatores-britain-to-bombay-cafe-rolls-out-new-menu/article71149944.ece",
+        "https://www.thehindu.com/food/dining/coimbatores-britain-to-bombay-1800-offers-salads-pastas-and-sandwiches-inspired-by-the-west/article67927844.ece"
+      ]
+    },
+    {
+      "id": "yes-yes-bakes",
+      "name": "Yes Yes Bakes",
+      "area": "Race Course",
+      "cuisine": "Bakery / café snacks",
+      "price": "₹",
+      "blurb": "Modest Race Course bakery opposite the Horse & Jockey statue (since 1999), featured in The Hindu’s 2025 food walk for hibiscus tea, egg bonda, cutlets and walker-friendly snacks.",
+      "tags": [
+        "highly_rated",
+        "cafe",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/features/coimbatore-race-course-road-valarmathi-mess-richie-rich/article69271220.ece"
+      ]
+    },
+    {
+      "id": "srkp-chettinad-mess",
+      "name": "SRKP Chettinad Mess",
+      "area": "Peelamedu (Hope College / Avinashi Road)",
+      "cuisine": "Chettinad / South Indian",
+      "price": "₹",
+      "blurb": "Busy Peelamedu Chettinad mess near Hope College with strong consistent Zomato dining scores for affordable South Indian non-veg plates and biryani; thinner editorial coverage than hotel icons.",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.zomato.com/coimbatore/srkp-chettinad-mess-peelamedu"
+      ]
+    },
+    {
+      "id": "sree-annapoorna-peelamedu",
+      "name": "Sree Annapoorna (Peelamedu / KMCH)",
+      "area": "Peelamedu (opp. KMCH)",
+      "cuisine": "South Indian vegetarian",
+      "price": "₹",
+      "blurb": "The Peelamedu–Padur Road branch NDTV Food specifically recommends for classic Annapoorna sambar, ghee roast and everyday vegetarian meals opposite KMCH.",
+      "tags": [
+        "highly_rated",
+        "vegetarian",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://food.ndtv.com/food-drinks/8-best-restaurants-in-coimbatore-to-explore-2618430",
+        "https://www.sreeannapoorna.com/"
+      ]
+    },
+    {
+      "id": "the-paniyaram-company",
+      "name": "The Paniyaram Company",
+      "area": "Peelamedu (Avinashi Road)",
+      "cuisine": "South Indian / paniyaram specialist",
+      "price": "₹",
+      "blurb": "Paniyaram specialist on Avinashi Road (beside SMS Hotels), covered by The Hindu for stuffed spins such as chilly cheese paniyaram; official site lists evening–late hours (closed Mondays).",
+      "tags": [
+        "highly_rated",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.thehindu.com/food/dining/try-a-chilly-cheese-paniyaram-in-coimbatore-from-the-paniyaram-company/article68113920.ece",
+        "https://thepaniyaramcompany.com/contact.html"
+      ]
+    },
+    {
+      "id": "shree-anandhaas-gandhipuram",
+      "name": "Shree Anandhaas (Gandhipuram)",
+      "area": "Gandhipuram",
+      "cuisine": "South Indian vegetarian",
+      "price": "₹",
+      "blurb": "Cross Cut Road pure-veg favourite near Gandhipuram bus stand with thousands of aggregated diner ratings for tiffin, meals and sweets; a convenient second Anandhaas stop beyond Lakshmi Mills.",
+      "tags": [
+        "highly_rated",
+        "vegetarian",
+        "local_classic"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://shreeanandhaas.com/",
+        "https://promallu.com/toprated/india/shree-anandhaas-gandhipuram-nmzgy/"
+      ]
+    },
+    {
+      "id": "all-rise",
+      "name": "All Rise",
+      "area": "Race Course",
+      "cuisine": "Café / multi-cuisine",
+      "price": "₹₹",
+      "blurb": "Race Course café from the On The Go / Café Totaram founders, listed on Zomato with strong dining scores as a sibling venue to Totaram’s soufflé-led space.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.zomato.com/coimbatore/all-rise-a-unit-of-cafe-totaram-race-course",
+        "https://www.thehindu.com/food/features/coimbatore-race-course-road-valarmathi-mess-richie-rich/article69271220.ece"
+      ]
+    },
+    {
+      "id": "tapriwala",
+      "name": "Tapriwala – The Contemporary Tea Cafe",
+      "area": "RS Puram",
+      "cuisine": "Tea café / snacks",
+      "price": "₹",
+      "blurb": "RS Puram contemporary tea café with very high Zomato dining scores for chai and light bites; thinner independent editorial coverage than Hindu/NDTV picks—treat as platform-led reputation.",
+      "tags": [
+        "highly_rated",
+        "cafe"
+      ],
+      "lat": null,
+      "lng": null,
+      "sources": [
+        "https://www.zomato.com/coimbatore/tapriwala-the-contemporary-tea-cafe-rs-puram"
+      ]
+    }
+  ],
+  "notes": "Curated for a personalised highly-rated tracker spanning fine dining, hotel dining, iconic casual veg/non-veg, Chettinad specialists and cafés (not a full city directory). Prefer editorial sources (The Hindu, NDTV Food) and hotel/official pages over raw star ratings; Zomato/TripAdvisor used mainly to corroborate continued listing or strong diner consensus. Lat/lng are approximate map-derived values where found; many are null. Price bands are inferred from editorial ‘meal for two’ figures or platform bands where stated—do not treat as live menu prices. Bird on Tree has thinner recent editorial coverage than hotel outlets (older Hindu review + NDTV + ongoing listings)—flag if verifying before a visit. SRKP Chettinad Mess, Tapriwala and The Paniyaram Company lean more on platform/single-feature evidence—confirm address/hours before a visit. Cahyo (mixed Zomato vs Hindu feature), Thalassery (weaker aggregate scores), Cheffy’s (very limited early hours in Hindu feature) and street stalls from food walks were excluded. Hours and dish availability change often and were not invented here. Expanded 2026-09-19 with casual icons (Annapoorna, Anandhaas, Junior Kuppanna, Kannappa) previously omitted from an earlier fine-dining-only cut."
+}
