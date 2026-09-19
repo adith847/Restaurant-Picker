@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coimbatore Restaurant Picker</title>
+  <meta name="description" content="Pick where to eat next in Coimbatore — track visited spots, filter by area, get suggestions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-wash" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🍛</span>
+      <div>
+        <p class="eyebrow">Kovai eats · local picks</p>
+        <h1>Coimbatore Restaurant Picker</h1>
+      </div>
+    </div>
+    <p class="tagline">Track what you’ve tried, filter by neighbourhood, and get a random untried suggestion when hunger hits.</p>
+  </header>
+
+  <section class="stats" aria-live="polite">
+    <div class="stat"><span class="stat-num" id="stat-total">0</span><span class="stat-label">Total</span></div>
+    <div class="stat"><span class="stat-num" id="stat-visited">0</span><span class="stat-label">Visited</span></div>
+    <div class="stat"><span class="stat-num" id="stat-remaining">0</span><span class="stat-label">Remaining</span></div>
+  </section>
+
+  <section class="toolbar" aria-label="Filters and actions">
+    <div class="filter-row">
+      <div class="segmented" role="group" aria-label="Visit status">
+        <button type="button" class="seg active" data-status="all">All</button>
+        <button type="button" class="seg" data-status="untried">Untried</button>
+        <button type="button" class="seg" data-status="visited">Visited</button>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Area</span>
+        <select id="area-filter">
+          <option value="">All areas</option>
+        </select>
+      </label>
+
+      <label class="field field-grow">
+        <span class="field-label">Search</span>
+        <input type="search" id="search" placeholder="Name or cuisine…" autocomplete="off" />
+      </label>
+    </div>
+
+    <div class="action-row">
+      <button type="button" class="btn btn-primary" id="btn-suggest">✨ Suggest for me</button>
+      <button type="button" class="btn btn-secondary" id="btn-nearby">📍 Nearby untried</button>
+      <button type="button" class="btn btn-ghost" id="btn-export">Export visited</button>
+      <label class="btn btn-ghost file-btn">
+        Import visited
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+      </label>
+    </div>
+    <p class="geo-status" id="geo-status" role="status"></p>
+  </section>
+
+  <section class="suggest-panel" id="suggest-panel" hidden>
+    <div class="suggest-head">
+      <h2 id="suggest-title">Suggestions</h2>
+      <button type="button" class="btn-icon" id="suggest-close" aria-label="Close suggestions">×</button>
+    </div>
+    <div id="suggest-list" class="suggest-list"></div>
+  </section>
+
+  <main>
+    <p class="list-meta" id="list-meta"></p>
+    <ul class="restaurant-list" id="restaurant-list"></ul>
+    <p class="empty" id="empty-state" hidden>No restaurants match these filters. Try clearing search or switching to All.</p>
+  </main>
+
+  <footer class="site-footer">
+    <p>Data snapshot for Coimbatore · visited state stays in your browser (localStorage).</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
