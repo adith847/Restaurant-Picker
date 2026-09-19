@@ -22,13 +22,13 @@ Any static server works (`npx serve`, `php -S`, etc.).
 
 - List: name, area, cuisine, price, blurb, tag chips — grouped by neighbourhood (RS Puram, Race Course, Gandhipuram, Peelamedu, …)
 - **Add to my list**: live Coimbatore place suggestions as you type (Mapbox Search Box if you paste a public `pk.` token; optional Google Places if a key is saved; otherwise OpenStreetMap + a verified seed). Click a match to add it with name/area/coords/type when the API returns them, or keep a fully custom name. Personal Google ★ is still optional and never invented.
-- **I’ve been** checkbox per place
+- **Remove from my list** on every card (confirm first). Custom adds are deleted from `customPlaces`; curated places are hidden via `hiddenIds` in this browser (`restaurants.json` is not edited). Undo toast right after a remove; export/import keeps the hidden set.
 - **Your rating** (1–5 stars, separate from any Google/editorial score) and **liked dishes** per place
 - Filters: All / Untried / Visited, neighbourhood area, cuisine bucket, name/cuisine/dish search
 - Stats: total / visited / remaining / your adds
 - **Suggest for me**: 1–3 untried picks ranked with the active cuisine (and area) filter, your rating, optional saved Google ★ on places you added, and liked dishes that match that cuisine vibe. Curated JSON has no invented Google ratings — those stars are only used when you saved them on a custom place. Editorial `highly_rated` tags are a tiny tie-break, not a fake score.
 - **Nearby**: geolocation; sorts untried with lat/lng by distance; null coords last; soft-fails if denied
-- Export / import a JSON backup of visits, notes, and custom places
+- Export / import a JSON backup of visits, notes, custom places, and hidden curated ids
 
 All of that is **browser-local**. It never leaves your browser unless you export it. Clearing site data or using another device/browser starts you from an empty personal list (the curated 47 still load).
 
@@ -36,7 +36,7 @@ All of that is **browser-local**. It never leaves your browser unless you export
 
 | Key | Role |
 |-----|------|
-| `cbe-picker-state-v2` | Canonical state: `{ version: 2, visited: string[], notes: { [id]: { rating, dishes } }, customPlaces: [...] }` |
+| `cbe-picker-state-v2` | Canonical state: `{ version: 2, visited: string[], notes: { [id]: { rating, dishes } }, customPlaces: [...], hiddenIds: string[] }` |
 | `cbe-picker-visited-v1` | Legacy visited-id array. Still **read** if v2 is missing, and **mirrored** on save so older backups/ticks are not stranded. |
 | `cbe-picker-settings-v1` | `{ mapboxAccessToken, googlePlacesApiKey }` only. **Not** exported, **not** committed. Lives in this browser so tokens never land in git or backup JSON. |
 
@@ -62,8 +62,8 @@ The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil N
 - Windows/Linux: `Ctrl+Shift+R` · Mac: `Cmd+Shift+R`
 - Prefer a **commit-pinned** rawcdn URL (not the branch raw.githack URL, which caches):  
   `https://rawcdn.githack.com/adith847/Restaurant-Picker/<commit-sha>/index.html`
-- Or open with a timestamp: `index.html?v=20260919-4`  
-  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-4`.
+- Or open with a timestamp: `index.html?v=20260919-5`  
+  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-5`.
 
 ### How Adi adds a Mapbox token (recommended)
 

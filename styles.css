@@ -525,8 +525,8 @@ h1 {
   color: var(--sage);
 }
 
-.geo-status.is-error {
-  color: var(--terracotta-deep);
+.geo-status .hint-link {
+  margin-left: 0.35rem;
 }
 
 .suggest-panel {
@@ -1019,6 +1019,14 @@ h1 {
   color: var(--terracotta-deep);
 }
 
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.7rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed var(--border);
+}
+
 .empty {
   text-align: center;
   padding: 2.5rem 1rem;
@@ -1082,7 +1090,8 @@ h1 {
     justify-content: center;
   }
 
-  .custom-edit .btn-remove-place {
+  .custom-edit .btn-remove-place,
+  .card-actions .btn-remove-place {
     flex: 1 1 100%;
   }
 }

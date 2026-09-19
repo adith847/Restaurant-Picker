@@ -9,7 +9,7 @@
   const CBE_BBOX = "76.80,10.85,77.18,11.22";
   const CBE_PROXIMITY = "76.9558,11.0168";
   /** Bump when JS/JSON change so GitHub/raw.githack previews do not keep a stale app.js. */
-  const ASSET_V = "20260919-4";
+  const ASSET_V = "20260919-5";
   /** Used if autocomplete-seed.json fails to load (common on cached previews). */
   const FALLBACK_SEED = [
     {
@@ -101,6 +101,9 @@
   let curated = [];
   /** @type {Array<Object>} */
   let customPlaces = [];
+  /** @type {Set<string>} curated ids hidden in this browser */
+  let hiddenIds = new Set();
+  let lastRemoved = null;
   /** @type {Array<Object>} */
   let restaurants = [];
   /** @type {Array<Object>} */
@@ -158,6 +161,8 @@
     visited = new Set();
     notes = {};
     customPlaces = [];
+    hiddenIds = new Set();
+    lastRemoved = null;
 
     try {
       const rawV2 = localStorage.getItem(STORAGE_KEY);
@@ -318,6 +323,15 @@
     visited = new Set(ids);
     notes = readNotesMap(parsed && parsed.notes);
     customPlaces = readCustomList(parsed && parsed.customPlaces);
+    hiddenIds = new Set([
+      ...readIdList(parsed && parsed.hiddenIds),
+      ...readIdList(parsed && parsed.removedIds),
+    ]);
+  }
+
+  function readIdList(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((id) => typeof id === "string" && id.trim());
   }
 
   function normalizeNotes(n) {
@@ -377,6 +391,7 @@
       visited: [...visited],
       notes,
       customPlaces,
+      hiddenIds: [...hiddenIds],
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     localStorage.setItem(STORAGE_KEY_V1, JSON.stringify([...visited]));
@@ -397,7 +412,71 @@
   }
 
   function rebuildRestaurants() {
-    restaurants = [...curated, ...customPlaces];
+    restaurants = [...curated.filter((r) => !hiddenIds.has(r.id)), ...customPlaces];
+  }
+
+  function removePlace(r) {
+    const custom = isCustom(r);
+    const ok = window.confirm(
+      custom
+        ? `Remove “${r.name}” from your list? This deletes the place you added.`
+        : `Remove “${r.name}” from your list? It stays hidden in this browser — the shared restaurants.json is unchanged.`
+    );
+    if (!ok) return;
+    lastRemoved = {
+      kind: custom ? "custom" : "curated",
+      place: custom
+        ? JSON.parse(JSON.stringify(customPlaces.find((p) => p.id === r.id) || r))
+        : { id: r.id, name: r.name },
+      wasVisited: visited.has(r.id),
+      notes: notes[r.id] ? getNotes(r.id) : null,
+    };
+    if (custom) {
+      customPlaces = customPlaces.filter((p) => p.id !== r.id);
+      visited.delete(r.id);
+      delete notes[r.id];
+    } else {
+      hiddenIds.add(r.id);
+    }
+    saveState();
+    rebuildRestaurants();
+    refreshFilterOptions();
+    updateStats();
+    renderList();
+    setStatus(`Removed ${r.name} from your list.`, false, { undo: undoLastRemove });
+  }
+
+  function undoLastRemove() {
+    const snap = lastRemoved;
+    lastRemoved = null;
+    if (!snap || !snap.place) return;
+    if (snap.kind === "custom") {
+      const restored = normalizeCustomPlace(snap.place);
+      if (restored && !customPlaces.some((p) => p.id === restored.id)) {
+        customPlaces.push(restored);
+      }
+      if (snap.wasVisited) visited.add(snap.place.id);
+      if (snap.notes) {
+        notes[snap.place.id] = {
+          rating: snap.notes.rating,
+          dishes: [...(snap.notes.dishes || [])],
+        };
+      }
+    } else {
+      hiddenIds.delete(snap.place.id);
+    }
+    saveState();
+    rebuildRestaurants();
+    refreshFilterOptions();
+    updateStats();
+    renderList();
+    setStatus(`Restored ${snap.place.name}.`);
+    requestAnimationFrame(() => {
+      document.querySelector(`.card[data-id="${CSS.escape(snap.place.id)}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   }
 
   function neighbourhood(area) {
@@ -464,9 +543,22 @@
     return Boolean(r && (r.custom || String(r.id).startsWith("custom-")));
   }
 
-  function setStatus(message, isError) {
+  function setStatus(message, isError, actions) {
     geoStatus.classList.toggle("is-error", Boolean(isError));
-    geoStatus.textContent = message;
+    geoStatus.replaceChildren();
+    if (!message) return;
+    const text = document.createElement("span");
+    text.textContent = message;
+    geoStatus.appendChild(text);
+    if (actions && typeof actions.undo === "function") {
+      geoStatus.appendChild(document.createTextNode(" "));
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hint-link";
+      btn.textContent = "Undo";
+      btn.addEventListener("click", actions.undo);
+      geoStatus.appendChild(btn);
+    }
   }
 
   function uniqueSorted(values) {
@@ -676,7 +768,6 @@
           <label class="mini-field mini-narrow">Google ★
             <input class="edit-google" type="number" min="0" max="5" step="0.1" value="${g != null ? escapeAttr(String(g)) : ""}" placeholder="—" />
           </label>
-          <button type="button" class="btn btn-ghost btn-tiny btn-remove-place">Remove</button>
         </div>`
       : "";
 
@@ -712,6 +803,9 @@
             <button type="submit" class="btn btn-ghost btn-tiny">Add</button>
           </form>
           ${customEditor}
+          <div class="card-actions">
+            <button type="button" class="btn btn-ghost btn-tiny btn-remove-place">Remove from my list</button>
+          </div>
         </div>
       </div>
     `;
@@ -778,19 +872,9 @@
       li.querySelector(".edit-area").addEventListener("change", persistCustomEdits);
       li.querySelector(".edit-cuisine").addEventListener("change", persistCustomEdits);
       li.querySelector(".edit-google").addEventListener("change", persistCustomEdits);
-      li.querySelector(".btn-remove-place").addEventListener("click", () => {
-        if (!window.confirm(`Remove “${r.name}” from your list?`)) return;
-        customPlaces = customPlaces.filter((p) => p.id !== r.id);
-        visited.delete(r.id);
-        delete notes[r.id];
-        saveState();
-        rebuildRestaurants();
-        refreshFilterOptions();
-        updateStats();
-        renderList();
-        setStatus(`Removed ${r.name} from your list.`);
-      });
     }
+
+    li.querySelector(".btn-remove-place").addEventListener("click", () => removePlace(r));
 
     return li;
   }
@@ -1012,6 +1096,7 @@
       visited: [...visited],
       notes,
       customPlaces,
+      hiddenIds: [...hiddenIds],
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -1038,13 +1123,21 @@
           data &&
           typeof data === "object" &&
           !Array.isArray(data) &&
-          (data.version === 2 || "notes" in data || "customPlaces" in data);
+          (data.version === 2 || "notes" in data || "customPlaces" in data || "hiddenIds" in data);
         if (isV2) {
           notes = readNotesMap(data.notes);
           customPlaces = readCustomList(data.customPlaces);
+          hiddenIds = new Set([
+            ...readIdList(data.hiddenIds),
+            ...readIdList(data.removedIds),
+          ]);
         }
         rebuildRestaurants();
-        const validIds = new Set(restaurants.map((r) => r.id));
+        const validIds = new Set([
+          ...restaurants.map((r) => r.id),
+          ...hiddenIds,
+          ...curated.map((r) => r.id),
+        ]);
         visited = new Set([...visited].filter((id) => validIds.has(id)));
         saveState();
         refreshFilterOptions();
