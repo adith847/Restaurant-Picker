@@ -6,8 +6,10 @@
   const SETTINGS_KEY = "cbe-picker-settings-v1";
   const CBE_CENTER = { lat: 11.0168, lng: 76.9558 };
   const CBE_RADIUS_KM = 40;
+  const CBE_BBOX = "76.80,10.85,77.18,11.22";
+  const CBE_PROXIMITY = "76.9558,11.0168";
   /** Bump when JS/JSON change so GitHub/raw.githack previews do not keep a stale app.js. */
-  const ASSET_V = "20260919-3";
+  const ASSET_V = "20260919-4";
   /** Used if autocomplete-seed.json fails to load (common on cached previews). */
   const FALLBACK_SEED = [
     {
@@ -138,11 +140,14 @@
   const placeSuggestLive = $("#place-suggest-live");
   const placesSettings = $("#places-settings");
   const googleKeyInput = $("#google-key");
+  const mapboxTokenInput = $("#mapbox-token");
   const placesProviderStatus = $("#places-provider-status");
   const addLookupHint = $("#add-lookup-hint");
 
-  let settings = { googlePlacesApiKey: "" };
+  let settings = { googlePlacesApiKey: "", mapboxAccessToken: "" };
   let googleSessionError = "";
+  let mapboxSessionError = "";
+  let mapboxSessionId = "";
   let suggestTimer = 0;
   let suggestAbort = null;
   let suggestItems = [];
@@ -178,9 +183,14 @@
     }
   }
 
+  function emptySettings() {
+    return { googlePlacesApiKey: "", mapboxAccessToken: "" };
+  }
+
   function loadSettings() {
-    settings = { googlePlacesApiKey: "" };
+    settings = emptySettings();
     googleSessionError = "";
+    mapboxSessionError = "";
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
       if (!raw) return;
@@ -188,15 +198,21 @@
       if (parsed && typeof parsed.googlePlacesApiKey === "string") {
         settings.googlePlacesApiKey = parsed.googlePlacesApiKey.trim();
       }
+      if (parsed && typeof parsed.mapboxAccessToken === "string") {
+        settings.mapboxAccessToken = parsed.mapboxAccessToken.trim();
+      }
     } catch {
-      settings = { googlePlacesApiKey: "" };
+      settings = emptySettings();
     }
   }
 
   function saveSettings() {
     localStorage.setItem(
       SETTINGS_KEY,
-      JSON.stringify({ googlePlacesApiKey: settings.googlePlacesApiKey })
+      JSON.stringify({
+        googlePlacesApiKey: settings.googlePlacesApiKey,
+        mapboxAccessToken: settings.mapboxAccessToken,
+      })
     );
     refreshPlacesProviderStatus();
   }
@@ -205,29 +221,64 @@
     return Boolean(settings.googlePlacesApiKey) && !googleSessionError;
   }
 
+  function hasMapboxToken() {
+    return Boolean(settings.mapboxAccessToken) && !mapboxSessionError;
+  }
+
+  function openPlacesSettings(focusEl) {
+    hidePlaceSuggest();
+    placesSettings.hidden = false;
+    $("#btn-places-settings").setAttribute("aria-expanded", "true");
+    (focusEl || mapboxTokenInput || googleKeyInput)?.focus();
+  }
+
+  function parseMapboxToken(raw) {
+    const token = String(raw || "").trim();
+    if (!token) return "";
+    if (token.startsWith("sk.")) {
+      throw new Error("Use a public pk. token, not a secret sk. token.");
+    }
+    if (!token.startsWith("pk.")) {
+      throw new Error("Mapbox public tokens start with pk.");
+    }
+    return token;
+  }
+
   function refreshPlacesProviderStatus() {
     if (!placesProviderStatus) return;
-    if (settings.googlePlacesApiKey && !googleSessionError) {
+    if (settings.mapboxAccessToken && !mapboxSessionError) {
+      placesProviderStatus.textContent =
+        "Using Mapbox Search Box, biased to Coimbatore. Public token stays in this browser only.";
+    } else if (settings.mapboxAccessToken && mapboxSessionError) {
+      placesProviderStatus.textContent = `Mapbox token saved but requests failed (${mapboxSessionError}). Falling back to ${
+        hasGoogleKey() ? "Google Places, then " : ""
+      }the verified Coimbatore list + OpenStreetMap.`;
+    } else if (settings.googlePlacesApiKey && !googleSessionError) {
       placesProviderStatus.textContent =
         "Using Google Places Autocomplete (New), biased to Coimbatore. Key stays in this browser only.";
     } else if (settings.googlePlacesApiKey && googleSessionError) {
       placesProviderStatus.textContent = `Google key saved but requests failed (${googleSessionError}). Falling back to the verified Coimbatore list + OpenStreetMap.`;
     } else {
       placesProviderStatus.textContent =
-        "No Google key — using the verified Coimbatore list + OpenStreetMap. Add a Places API (New) key for better live matches.";
+        "No Mapbox token — using the verified Coimbatore list + OpenStreetMap. Paste a Mapbox pk. token for live matches (Google Cloud billing is optional and often blocked in India).";
     }
     if (addLookupHint) {
-      addLookupHint.innerHTML = hasGoogleKey()
-        ? "Live suggestions: your list, Google Places, and the verified Coimbatore index."
-        : `Live suggestions: your list + a verified Coimbatore index + OSM. <button type="button" class="hint-link" id="hint-open-places">Add a Google key</button> for Maps-quality matches (OSM often has gaps).`;
-      const hintBtn = $("#hint-open-places");
-      if (hintBtn) {
-        hintBtn.addEventListener("click", () => {
-          placesSettings.hidden = false;
-          $("#btn-places-settings").setAttribute("aria-expanded", "true");
-          googleKeyInput.focus();
-        });
+      if (hasMapboxToken()) {
+        addLookupHint.textContent =
+          "Live suggestions: your list, Mapbox Search, and the verified Coimbatore index.";
+      } else if (hasGoogleKey()) {
+        addLookupHint.textContent =
+          "Live suggestions: your list, Google Places, and the verified Coimbatore index.";
+      } else {
+        addLookupHint.innerHTML = `Live suggestions: your list + a verified Coimbatore index + OSM. <button type="button" class="hint-link" id="hint-open-places">Add a Mapbox token</button> for live matches (OSM often has gaps; Google Cloud billing is optional).`;
+        const hintBtn = $("#hint-open-places");
+        if (hintBtn) {
+          hintBtn.addEventListener("click", () => openPlacesSettings(mapboxTokenInput));
+        }
       }
+    }
+    if (mapboxTokenInput && mapboxTokenInput !== document.activeElement) {
+      mapboxTokenInput.value = settings.mapboxAccessToken;
     }
     if (googleKeyInput && googleKeyInput !== document.activeElement) {
       googleKeyInput.value = settings.googlePlacesApiKey;
@@ -1277,8 +1328,12 @@
   }
 
   function suggestProviderHint() {
+    if (settings.mapboxAccessToken && !mapboxSessionError) return "Mapbox Search · Coimbatore";
+    if (settings.mapboxAccessToken && mapboxSessionError) {
+      return `Mapbox failed (${mapboxSessionError}) — using seed + OSM`;
+    }
     if (hasGoogleKey()) return "Google Places · Coimbatore";
-    return "OSM coverage is patchy — add a Google key for better matches";
+    return "OSM coverage is patchy — add a Mapbox token for better matches";
   }
 
   function hidePlaceSuggest() {
@@ -1312,6 +1367,7 @@
         let badge = "";
         if (item.kind === "local") badge = `<span class="place-suggest-badge">On your list</span>`;
         else if (item.kind === "seed") badge = `<span class="place-suggest-badge is-verified">Verified</span>`;
+        else if (item.provider === "mapbox") badge = `<span class="place-suggest-badge is-mapbox">Mapbox</span>`;
         const title =
           item.kind === "custom"
             ? `Add “${item.name}” as a custom place`
@@ -1334,8 +1390,8 @@
     const footBits = [];
     if (loading) footBits.push("Searching Coimbatore…");
     if (providerHint) footBits.push(providerHint);
-    const cta = !hasGoogleKey()
-      ? `<button type="button" class="place-suggest-cta" id="suggest-open-key">Add a Google key</button>`
+    const cta = !hasMapboxToken() && !hasGoogleKey()
+      ? `<button type="button" class="place-suggest-cta" id="suggest-open-key">Add a Mapbox token</button>`
       : "";
     const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" · "))}${cta}</li>`;
     placeSuggestList.innerHTML = head + rows + foot;
@@ -1355,10 +1411,7 @@
     if (ctaBtn) {
       ctaBtn.addEventListener("mousedown", (e) => e.preventDefault());
       ctaBtn.addEventListener("click", () => {
-        hidePlaceSuggest();
-        placesSettings.hidden = false;
-        $("#btn-places-settings").setAttribute("aria-expanded", "true");
-        googleKeyInput.focus();
+        openPlacesSettings(mapboxTokenInput);
       });
     }
   }
@@ -1366,14 +1419,18 @@
   function suggestionPriority(item) {
     if (!item) return 9;
     if (item.kind === "local") return 0;
-    if (item.kind === "seed") return 1;
-    if (item.kind === "remote" && item.provider === "google") return 2;
-    if (item.kind === "remote") return 3;
-    if (item.kind === "custom") return 4;
-    return 5;
+    if (item.kind === "remote" && item.provider === "mapbox" && (item.matchScore || 0) >= 70) {
+      return 1;
+    }
+    if (item.kind === "seed") return 2;
+    if (item.kind === "remote" && item.provider === "mapbox") return 3;
+    if (item.kind === "remote" && item.provider === "google") return 4;
+    if (item.kind === "remote") return 5;
+    if (item.kind === "custom") return 6;
+    return 7;
   }
 
-  /** Local hits, then verified seed, then Google, then OSM. Never let Photon junk outrank seed. */
+  /** Local, strong Mapbox POIs, verified seed, other Mapbox, Google, then OSM. */
   function mergeSuggestionLists(local, seed, remote) {
     const combined = [...(local || []), ...(seed || []), ...(remote || [])].sort(
       (a, b) => suggestionPriority(a) - suggestionPriority(b)
@@ -1435,6 +1492,229 @@
     if (isJunkOsm(item) && !strongName) return false;
     if (isFoodishOsm(item)) return true;
     return nameMatchScore(query, item.name) >= 80;
+  }
+
+  function newUuid() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  function ensureMapboxSession() {
+    if (!mapboxSessionId) mapboxSessionId = newUuid();
+    return mapboxSessionId;
+  }
+
+  function rotateMapboxSession() {
+    mapboxSessionId = newUuid();
+  }
+
+  function ctxName(ctx, key) {
+    return (ctx && ctx[key] && ctx[key].name) || "";
+  }
+
+  function areaFromMapboxContext(ctx, placeFormatted) {
+    const candidate =
+      ctxName(ctx, "neighborhood") ||
+      ctxName(ctx, "locality") ||
+      ctxName(ctx, "district") ||
+      ctxName(ctx, "place") ||
+      String(placeFormatted || "").split(",")[0];
+    if (!candidate) return "";
+    const hood = neighbourhood(candidate);
+    return hood && hood !== "Unspecified" ? hood : candidate;
+  }
+
+  function mapboxHay(item) {
+    return `${item.name || ""} ${item.area || ""} ${item.address || ""} ${item.typeLabel || ""}`;
+  }
+
+  function isFoodishMapbox(item) {
+    const blob = `${mapboxHay(item)} ${(item.poiCategories || []).join(" ")}`.toLowerCase();
+    return /\b(restaurant|food|cafe|café|coffee|bar|pub|bakery|bistro|diner|eatery|meal|kitchen|fast.food)\b/.test(
+      blob
+    );
+  }
+
+  function isShopishMapbox(item) {
+    const blob = `${mapboxHay(item)} ${(item.poiCategories || []).join(" ")}`.toLowerCase();
+    return /\b(supermarket|convenience|grocery|department.store|shopping|clothes|hardware|electronics|mall)\b/.test(
+      blob
+    ) || /\bstores?\b/.test(String(item.name || "").toLowerCase());
+  }
+
+  function keepMapboxSuggestion(item, query) {
+    if (!item || !item.name) return false;
+    if (item.featureType === "category") return false;
+    if (!hasStrongTokenOverlap(query, item.name)) return false;
+    const hay = mapboxHay(item);
+    if (
+      /bengaluru|bangalore|chennai|hyderabad|mumbai|delhi|pune|kochi|madurai|mysuru|mysore/i.test(hay) &&
+      !/coimbatore|kovai/i.test(hay)
+    ) {
+      return false;
+    }
+    const strongName = nameMatchScore(query, item.name) >= 90;
+    if (isShopishMapbox(item) && !strongName) return false;
+    if (isFoodishMapbox(item) || item.featureType === "poi") return true;
+    return nameMatchScore(query, item.name) >= 80;
+  }
+
+  function mapboxSuggestToItem(row) {
+    const name = row.name_preferred || row.name || "";
+    const cats = Array.isArray(row.poi_category) ? row.poi_category : [];
+    const typeRaw = cats[0] || row.feature_type || "";
+    const placeFormatted = row.place_formatted || row.full_address || "";
+    return {
+      kind: "remote",
+      provider: "mapbox",
+      mapboxId: row.mapbox_id,
+      name,
+      area: areaFromMapboxContext(row.context, placeFormatted),
+      address: row.full_address || placeFormatted || row.address || "",
+      typeLabel: humanPlaceType(typeRaw) || (row.feature_type === "poi" ? "Place" : humanPlaceType(row.feature_type)),
+      cuisine: cuisineFromType(typeRaw, cats.join(",")),
+      poiCategories: cats,
+      featureType: row.feature_type || "",
+      matchScore: nameMatchScore(suggestQuery || name, name),
+      providerLabel: "Mapbox",
+      external: row.mapbox_id ? { provider: "mapbox", id: row.mapbox_id } : null,
+    };
+  }
+
+  function mapboxFeatureToItem(feature) {
+    const props = (feature && feature.properties) || {};
+    const coords = (feature && feature.geometry && feature.geometry.coordinates) || [];
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    const name = props.name_preferred || props.name || "";
+    const cats = Array.isArray(props.poi_category) ? props.poi_category : [];
+    const typeRaw = cats[0] || props.feature_type || "";
+    const placeFormatted = props.place_formatted || props.full_address || "";
+    return {
+      kind: "remote",
+      provider: "mapbox",
+      mapboxId: props.mapbox_id,
+      name,
+      area: areaFromMapboxContext(props.context, placeFormatted),
+      address: props.full_address || placeFormatted || props.address || "",
+      typeLabel: humanPlaceType(typeRaw) || (props.feature_type === "poi" ? "Place" : humanPlaceType(props.feature_type)),
+      cuisine: cuisineFromType(typeRaw, cats.join(",")),
+      poiCategories: cats,
+      featureType: props.feature_type || "",
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      matchScore: nameMatchScore(suggestQuery || name, name),
+      providerLabel: "Mapbox",
+      external: props.mapbox_id ? { provider: "mapbox", id: props.mapbox_id } : null,
+    };
+  }
+
+  function mapboxErrorMessage(data, res) {
+    return (
+      (data && (data.message || data.error_description || data.error)) ||
+      `HTTP ${res.status}`
+    );
+  }
+
+  async function fetchMapboxSearchBox(query, signal) {
+    const params = new URLSearchParams({
+      q: query,
+      access_token: settings.mapboxAccessToken,
+      session_token: ensureMapboxSession(),
+      language: "en",
+      limit: "8",
+      country: "IN",
+      proximity: CBE_PROXIMITY,
+      bbox: CBE_BBOX,
+      types: "poi,address",
+    });
+    const res = await fetch(`https://api.mapbox.com/search/searchbox/v1/suggest?${params}`, {
+      signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(mapboxErrorMessage(data, res));
+    return (data.suggestions || [])
+      .map(mapboxSuggestToItem)
+      .map((item) => ({ ...item, matchScore: nameMatchScore(query, item.name) }))
+      .filter((item) => keepMapboxSuggestion(item, query));
+  }
+
+  async function fetchMapboxGeocode(query, signal) {
+    const params = new URLSearchParams({
+      q: query,
+      access_token: settings.mapboxAccessToken,
+      language: "en",
+      limit: "8",
+      country: "in",
+      proximity: CBE_PROXIMITY,
+      bbox: CBE_BBOX,
+      types: "poi,address",
+    });
+    const res = await fetch(`https://api.mapbox.com/search/geocode/v6/forward?${params}`, {
+      signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(mapboxErrorMessage(data, res));
+    return (data.features || [])
+      .map(mapboxFeatureToItem)
+      .map((item) => ({ ...item, matchScore: nameMatchScore(query, item.name) }))
+      .filter((item) => keepMapboxSuggestion(item, query));
+  }
+
+  async function fetchMapboxSuggestions(query, signal) {
+    try {
+      return await fetchMapboxSearchBox(query, signal);
+    } catch (err) {
+      if (signal && signal.aborted) throw err;
+      const msg = String(err.message || "");
+      if (/401|403|not authorized|invalid token|forbidden/i.test(msg)) throw err;
+      return fetchMapboxGeocode(query, signal);
+    }
+  }
+
+  async function fetchMapboxRetrieve(mapboxId) {
+    const params = new URLSearchParams({
+      access_token: settings.mapboxAccessToken,
+      session_token: ensureMapboxSession(),
+      language: "en",
+    });
+    const res = await fetch(
+      `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?${params}`
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(mapboxErrorMessage(data, res));
+    rotateMapboxSession();
+    const feature = (data.features || [])[0];
+    if (!feature) throw new Error("No Mapbox place details");
+    const item = mapboxFeatureToItem(feature);
+    const props = feature.properties || {};
+    const coords = props.coordinates || {};
+    const lat =
+      typeof item.lat === "number"
+        ? item.lat
+        : typeof coords.latitude === "number"
+          ? coords.latitude
+          : null;
+    const lng =
+      typeof item.lng === "number"
+        ? item.lng
+        : typeof coords.longitude === "number"
+          ? coords.longitude
+          : null;
+    return {
+      name: item.name,
+      area: item.area,
+      cuisine: item.cuisine,
+      lat,
+      lng,
+      sources: [],
+      tags: ["added_by_you"],
+      external: item.external,
+    };
   }
 
   async function fetchGoogleAutocomplete(query, signal) {
@@ -1676,6 +1956,18 @@
   }
 
   async function fetchRemoteSuggestions(query, signal) {
+    if (hasMapboxToken()) {
+      try {
+        const mapboxItems = await fetchMapboxSuggestions(query, signal);
+        mapboxSessionError = "";
+        refreshPlacesProviderStatus();
+        if (mapboxItems.length) return mapboxItems;
+      } catch (err) {
+        if (signal && signal.aborted) throw err;
+        mapboxSessionError = err.message || "request failed";
+        refreshPlacesProviderStatus();
+      }
+    }
     if (hasGoogleKey()) {
       try {
         const googleItems = await fetchGoogleAutocomplete(query, signal);
@@ -1771,6 +2063,23 @@
       external: item.external || null,
       tags: ["added_by_you"],
     };
+    if (item.provider === "mapbox" && item.mapboxId && hasMapboxToken() && item.lat == null) {
+      setStatus(`Looking up ${item.name}…`);
+      try {
+        const details = await fetchMapboxRetrieve(item.mapboxId);
+        partial = {
+          ...partial,
+          ...details,
+          name: details.name || item.name,
+          cuisine: details.cuisine || item.cuisine || "",
+        };
+        addName.value = partial.name;
+        addArea.value = partial.area || addArea.value;
+        addCuisine.value = partial.cuisine || addCuisine.value;
+      } catch (err) {
+        setStatus(`Couldn’t load Mapbox details (${err.message}); adding with suggestion text.`, true);
+      }
+    }
     if (item.provider === "google" && item.placeId && hasGoogleKey()) {
       setStatus(`Looking up ${item.name}…`);
       try {
@@ -1883,12 +2192,41 @@
     });
     $("#btn-places-settings").addEventListener("click", () => {
       const open = placesSettings.hidden;
-      placesSettings.hidden = !open;
-      $("#btn-places-settings").setAttribute("aria-expanded", open ? "true" : "false");
       if (open) {
+        openPlacesSettings(mapboxTokenInput);
         refreshPlacesProviderStatus();
-        googleKeyInput.focus();
+      } else {
+        placesSettings.hidden = true;
+        $("#btn-places-settings").setAttribute("aria-expanded", "false");
       }
+    });
+    $("#btn-save-mapbox").addEventListener("click", () => {
+      try {
+        settings.mapboxAccessToken = parseMapboxToken(mapboxTokenInput.value);
+      } catch (err) {
+        setStatus(err.message, true);
+        return;
+      }
+      mapboxSessionError = "";
+      rotateMapboxSession();
+      saveSettings();
+      setStatus(
+        settings.mapboxAccessToken
+          ? "Mapbox token saved in this browser. Suggestions will use Mapbox Search Box."
+          : "Cleared Mapbox token."
+      );
+    });
+    $("#btn-clear-mapbox").addEventListener("click", () => {
+      mapboxTokenInput.value = "";
+      settings.mapboxAccessToken = "";
+      mapboxSessionError = "";
+      rotateMapboxSession();
+      saveSettings();
+      setStatus(
+        hasGoogleKey()
+          ? "Mapbox cleared. Suggestions will use Google Places if the key still works."
+          : "Mapbox cleared. Using the verified Coimbatore list + OpenStreetMap."
+      );
     });
     $("#btn-save-key").addEventListener("click", () => {
       settings.googlePlacesApiKey = googleKeyInput.value.trim();
@@ -1896,8 +2234,8 @@
       saveSettings();
       setStatus(
         settings.googlePlacesApiKey
-          ? "Google Places key saved in this browser. Suggestions will use Google when possible."
-          : "Cleared. Suggestions will use OpenStreetMap."
+          ? "Google Places key saved in this browser. Used only if Mapbox is not set."
+          : "Cleared Google key."
       );
     });
     $("#btn-clear-key").addEventListener("click", () => {
@@ -1905,7 +2243,7 @@
       settings.googlePlacesApiKey = "";
       googleSessionError = "";
       saveSettings();
-      setStatus("Using OpenStreetMap for place suggestions.");
+      setStatus("Google key cleared.");
     });
     $("#btn-suggest").addEventListener("click", pickSuggestions);
     $("#suggest-close").addEventListener("click", () => {

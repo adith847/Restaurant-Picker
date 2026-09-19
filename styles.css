@@ -264,6 +264,23 @@ h1 {
   line-height: 1.45;
 }
 
+.settings-block {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px dashed var(--border);
+}
+
+.settings-block:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.settings-help a {
+  color: var(--terracotta-deep);
+  font-weight: 600;
+}
+
 .settings-help code {
   font-size: 0.74rem;
   background: var(--paper);
@@ -379,7 +396,12 @@ h1 {
 
 .place-suggest-badge.is-verified {
   background: #d7e4d4;
-  color: var(--sage);
+  color: #3d5c45;
+}
+
+.place-suggest-badge.is-mapbox {
+  background: #d4e4ee;
+  color: #2c5d73;
 }
 
 .place-suggest-item.is-custom-add {

@@ -21,7 +21,7 @@ Any static server works (`npx serve`, `php -S`, etc.).
 ## Features
 
 - List: name, area, cuisine, price, blurb, tag chips — grouped by neighbourhood (RS Puram, Race Course, Gandhipuram, Peelamedu, …)
-- **Add to my list**: live Coimbatore place suggestions as you type (Google Places if you paste a key; otherwise OpenStreetMap). Click a match to add it with name/area/coords/type when the API returns them, or keep a fully custom name. Personal Google ★ is still optional and never invented.
+- **Add to my list**: live Coimbatore place suggestions as you type (Mapbox Search Box if you paste a public `pk.` token; optional Google Places if a key is saved; otherwise OpenStreetMap + a verified seed). Click a match to add it with name/area/coords/type when the API returns them, or keep a fully custom name. Personal Google ★ is still optional and never invented.
 - **I’ve been** checkbox per place
 - **Your rating** (1–5 stars, separate from any Google/editorial score) and **liked dishes** per place
 - Filters: All / Untried / Visited, neighbourhood area, cuisine bucket, name/cuisine/dish search
@@ -38,7 +38,7 @@ All of that is **browser-local**. It never leaves your browser unless you export
 |-----|------|
 | `cbe-picker-state-v2` | Canonical state: `{ version: 2, visited: string[], notes: { [id]: { rating, dishes } }, customPlaces: [...] }` |
 | `cbe-picker-visited-v1` | Legacy visited-id array. Still **read** if v2 is missing, and **mirrored** on save so older backups/ticks are not stranded. |
-| `cbe-picker-settings-v1` | `{ googlePlacesApiKey }` only. **Not** exported, **not** committed. Lives in this browser so a key never lands in git or backup JSON. |
+| `cbe-picker-settings-v1` | `{ mapboxAccessToken, googlePlacesApiKey }` only. **Not** exported, **not** committed. Lives in this browser so tokens never land in git or backup JSON. |
 
 Export writes `coimbatore-picker.json` (v2). Import accepts v2 backups **or** the older `{ visited: string[] }` / raw id-array files.
 
@@ -49,10 +49,11 @@ Custom places merge with the curated 47; they never overwrite `restaurants.json`
 The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil Nadu.
 
 1. **Already on your list** — curated + custom names match first. Clicking jumps to that card instead of duplicating it (e.g. **The Living Room**).
-2. **Verified Coimbatore index** (`autocomplete-seed.json`) — ranked **above** OpenStreetMap. OSM does not know **The Asian Stories**; the seed still suggests Saibaba Colony. No invented ratings/hours/dishes.
-3. **Google Places Autocomplete (New)** — if you save an API key in **Places search / Google key**. Place Details may pre-fill area, coordinates, a Google ★, and a Maps link *only when Google returns those fields*.
-4. **OpenStreetMap** — Nominatim + Photon only if **every query token** overlaps the place name. Photon fuzzy hits like “amutha/nalan stores” for “Asian Stories” are dropped. Supermarket / convenience / department_store / `shop=*` are banned unless the name strongly matches what you typed.
-5. **Never silent-empty** — queries of 2+ characters always show a dropdown, including **Add “{name}” as a custom place** when nothing else matches, plus a Google-key CTA if none is saved.
+2. **Mapbox Search Box** — if you save a public `pk.` token in **Places search / API keys**. Suggest + retrieve, biased to Coimbatore (India, proximity + bbox). Clicking a hit retrieves coordinates and area when Mapbox returns them. No invented ratings/hours/dishes.
+3. **Google Places Autocomplete (New)** — optional fallback if a Google key is saved **and** Mapbox is not working. Often blocked in India by RBI / auto-pay on Google Cloud billing.
+4. **Verified Coimbatore index** (`autocomplete-seed.json`) — ranked **above** OpenStreetMap (and below a strong Mapbox POI). OSM does not know **The Asian Stories**; the seed still suggests Saibaba Colony.
+5. **OpenStreetMap** — Nominatim + Photon only if **every query token** overlaps the place name. Photon fuzzy hits like “amutha/nalan stores” for “Asian Stories” are dropped. Supermarket / convenience / department_store / `shop=*` are banned unless the name strongly matches what you typed.
+6. **Never silent-empty** — queries of 2+ characters always show a dropdown, including **Add “{name}” as a custom place** when nothing else matches, plus a Mapbox-token CTA if none is saved.
 
 ### Preview this branch (avoid stale JS)
 
@@ -61,10 +62,28 @@ The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil N
 - Windows/Linux: `Ctrl+Shift+R` · Mac: `Cmd+Shift+R`
 - Prefer a **commit-pinned** rawcdn URL (not the branch raw.githack URL, which caches):  
   `https://rawcdn.githack.com/adith847/Restaurant-Picker/<commit-sha>/index.html`
-- Or open with a timestamp: `index.html?v=20260919-3`  
-  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-3`.
+- Or open with a timestamp: `index.html?v=20260919-4`  
+  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-4`.
 
-### How Adi adds a Google key (optional)
+### How Adi adds a Mapbox token (recommended)
+
+Do this at [Mapbox Access Tokens](https://account.mapbox.com/access-tokens/). Never paste a real token into the repo. **Do not use a secret `sk.` token** — only a **public** token starting with `pk.`.
+
+1. Create a Mapbox account (the free tier includes a monthly Search Box allowance; no Google Cloud / RBI auto-pay).
+2. **Create a token** → public token with the default public scopes (Search Box / geocoding work with a default public token).
+3. **URL restrictions** (optional but recommended). Add:
+   - `https://adith847.github.io`
+   - `https://raw.githack.com`
+   - `https://rawcdn.githack.com`
+   - `http://127.0.0.1`
+   - `http://localhost`
+4. Open the picker → **Places search / API keys** → paste the `pk.` token → **Save Mapbox token**. It is stored as `cbe-picker-settings-v1.mapboxAccessToken` in `localStorage` on that machine/browser only.
+
+Without a token, type **Asian Stories** — it should still suggest The Asian Stories (Saibaba Colony) from the verified index, not store junk. You can always choose **Add “…” as a custom place**.
+
+### How Adi adds a Google key (optional — often blocked)
+
+Google Places needs Cloud billing. Indian RBI / auto-pay rules often prevent completing that payment, which is why Mapbox is the default live path. Skip this section unless you already have a working Google key.
 
 Do this in [Google Cloud Console](https://console.cloud.google.com/). Never paste a real key into the repo.
 
@@ -79,9 +98,7 @@ Do this in [Google Cloud Console](https://console.cloud.google.com/). Never past
      `http://127.0.0.1:*`  
      `http://localhost:*`
    - **API restrictions → Restrict key → Places API (New)**
-5. Open the picker → **Places search** → paste the key → **Save key**. It is stored as `cbe-picker-settings-v1` in `localStorage` on that machine/browser only.
-
-Without a key, type **Asian Stories** — it should suggest The Asian Stories (Saibaba Colony) from the verified index, not fail silently. You can always choose **Add “…” as a custom place** if nothing matches.
+5. Open the picker → **Places search / API keys** → paste the key → **Save Google key**. Used only when Mapbox is not set or Mapbox requests fail.
 
 ## Files
 
