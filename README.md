@@ -4,6 +4,8 @@ Single-page static app to browse **47 Coimbatore restaurants**, mark places youâ
 
 **Origin repo:** [https://cursor.com/codebase/adi-th/Restaurant-Picker](https://cursor.com/codebase/adi-th/Restaurant-Picker)
 
+**Public site:** [https://adith847.github.io/Restaurant-Picker/](https://adith847.github.io/Restaurant-Picker/)
+
 ## Run locally
 
 Serve the repo root over HTTP so `fetch('restaurants.json')` works. Opening `index.html` via `file://` usually fails.
