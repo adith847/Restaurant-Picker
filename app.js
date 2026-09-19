@@ -1292,9 +1292,6 @@
     const footBits = [];
     if (loading) footBits.push("Searching Coimbatore…");
     if (providerHint) footBits.push(providerHint);
-    if (!hasGoogleKey()) {
-      footBits.push("Add a Google Places key for better matches");
-    }
     const cta = !hasGoogleKey()
       ? `<button type="button" class="place-suggest-cta" id="suggest-open-key">Add a Google key</button>`
       : "";
