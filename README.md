@@ -4,7 +4,7 @@ Single-page static app to browse **47 Coimbatore restaurants**, mark places youâ
 
 **Origin repo:** [https://cursor.com/codebase/adi-th/Restaurant-Picker](https://cursor.com/codebase/adi-th/Restaurant-Picker)
 
-**Public site:** [https://adith847.github.io/Restaurant-Picker/](https://adith847.github.io/Restaurant-Picker/)
+**GitHub Pages URL (enable Pages on `main` / `/` root to go live):** [https://adith847.github.io/Restaurant-Picker/](https://adith847.github.io/Restaurant-Picker/)
 
 ## Run locally
 
