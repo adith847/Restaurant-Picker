@@ -1214,7 +1214,7 @@
     if (loading) footBits.push("Searching Coimbatore…");
     if (providerHint) footBits.push(providerHint);
     footBits.push("No match? Keep the name and click Add place for a custom entry.");
-    const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" "))}</li>`;
+    const foot = `<li class="place-suggest-foot" role="presentation">${escapeHtml(footBits.join(" · "))}</li>`;
     placeSuggestList.innerHTML = head + rows + foot;
     placeSuggestList.hidden = false;
     addName.setAttribute("aria-expanded", "true");
