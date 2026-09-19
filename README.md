@@ -62,8 +62,8 @@ The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil N
 - Windows/Linux: `Ctrl+Shift+R` · Mac: `Cmd+Shift+R`
 - Prefer a **commit-pinned** rawcdn URL (not the branch raw.githack URL, which caches):  
   `https://rawcdn.githack.com/adith847/Restaurant-Picker/<commit-sha>/index.html`
-- Or open with a timestamp: `index.html?v=20260919-6`  
-  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-6`.
+- Or open with a timestamp: `index.html?v=20260919-7`  
+  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-7`.
 
 ### How Adi adds a Mapbox token (recommended)
 

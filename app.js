@@ -9,7 +9,7 @@
   const CBE_BBOX = "76.80,10.85,77.18,11.22";
   const CBE_PROXIMITY = "76.9558,11.0168";
   /** Bump when JS/JSON change so GitHub/raw.githack previews do not keep a stale app.js. */
-  const ASSET_V = "20260919-6";
+  const ASSET_V = "20260919-7";
   /** Used if autocomplete-seed.json fails to load (common on cached previews). */
   const FALLBACK_SEED = [
     {
@@ -566,7 +566,7 @@
     if (/openstreetmap\.org/i.test(host)) return "OpenStreetMap";
     if (/district\.in/i.test(host)) return "district.in";
     if (/google\./i.test(host)) return "Google listing";
-    if (host) return host.replace(/\.[a-z]{2,}$/i, "");
+    if (host) return "Website";
     return "Source";
   }
 
