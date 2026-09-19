@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Coimbatore Restaurant Picker</title>
-  <meta name="description" content="Pick where to eat next in Coimbatore — track visited spots, filter by area, get suggestions." />
+  <meta name="description" content="Pick where to eat next in Coimbatore — add your own spots, rate them, note liked dishes, filter by area and cuisine." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
@@ -21,13 +21,42 @@
         <h1>Coimbatore Restaurant Picker</h1>
       </div>
     </div>
-    <p class="tagline">Track what you’ve tried, filter by neighbourhood, and get a random untried suggestion when hunger hits.</p>
+    <p class="tagline">Add your own Kovai spots, rate them, note dishes you love, and get suggestions that respect area, cuisine, and your taste.</p>
   </header>
 
   <section class="stats" aria-live="polite">
     <div class="stat"><span class="stat-num" id="stat-total">0</span><span class="stat-label">Total</span></div>
     <div class="stat"><span class="stat-num" id="stat-visited">0</span><span class="stat-label">Visited</span></div>
     <div class="stat"><span class="stat-num" id="stat-remaining">0</span><span class="stat-label">Remaining</span></div>
+    <div class="stat"><span class="stat-num" id="stat-custom">0</span><span class="stat-label">Your adds</span></div>
+  </section>
+
+  <section class="add-panel" aria-label="Add a restaurant">
+    <div class="add-head">
+      <h2>Add to my list</h2>
+      <p>Type a restaurant or café name to keep places beyond the curated 47. Area and cuisine are optional — you can edit them later.</p>
+    </div>
+    <form id="add-form" class="add-form">
+      <label class="field field-grow">
+        <span class="field-label">Name</span>
+        <input id="add-name" name="name" required placeholder="e.g. A friend’s café in RS Puram" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Area</span>
+        <input id="add-area" name="area" list="area-suggestions" placeholder="RS Puram" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Cuisine</span>
+        <input id="add-cuisine" name="cuisine" list="cuisine-suggestions" placeholder="South Indian" autocomplete="off" />
+      </label>
+      <label class="field field-narrow">
+        <span class="field-label">Google ★</span>
+        <input id="add-google" name="googleRating" type="number" min="0" max="5" step="0.1" placeholder="optional" inputmode="decimal" />
+      </label>
+      <button type="submit" class="btn btn-primary" id="btn-add">Add place</button>
+    </form>
+    <datalist id="area-suggestions"></datalist>
+    <datalist id="cuisine-suggestions"></datalist>
   </section>
 
   <section class="toolbar" aria-label="Filters and actions">
@@ -45,18 +74,25 @@
         </select>
       </label>
 
+      <label class="field">
+        <span class="field-label">Cuisine</span>
+        <select id="cuisine-filter">
+          <option value="">All cuisines</option>
+        </select>
+      </label>
+
       <label class="field field-grow">
         <span class="field-label">Search</span>
-        <input type="search" id="search" placeholder="Name or cuisine…" autocomplete="off" />
+        <input type="search" id="search" placeholder="Name, cuisine, area, or a liked dish…" autocomplete="off" />
       </label>
     </div>
 
     <div class="action-row">
       <button type="button" class="btn btn-primary" id="btn-suggest">✨ Suggest for me</button>
       <button type="button" class="btn btn-secondary" id="btn-nearby">📍 Nearby untried</button>
-      <button type="button" class="btn btn-ghost" id="btn-export">Export visited</button>
+      <button type="button" class="btn btn-ghost" id="btn-export">Export backup</button>
       <label class="btn btn-ghost file-btn">
-        Import visited
+        Import backup
         <input type="file" id="import-file" accept="application/json,.json" hidden />
       </label>
     </div>
@@ -74,11 +110,11 @@
   <main>
     <p class="list-meta" id="list-meta"></p>
     <ul class="restaurant-list" id="restaurant-list"></ul>
-    <p class="empty" id="empty-state" hidden>No restaurants match these filters. Try clearing search or switching to All.</p>
+    <p class="empty" id="empty-state" hidden>No restaurants match these filters. Try clearing search, cuisine, or switching to All.</p>
   </main>
 
   <footer class="site-footer">
-    <p>Data snapshot for Coimbatore · visited state stays in your browser (localStorage).</p>
+    <p>Curated Coimbatore snapshot · your adds, ratings, dishes, and visited ticks stay in this browser (localStorage) unless you export them.</p>
   </footer>
 
   <script src="app.js"></script>
