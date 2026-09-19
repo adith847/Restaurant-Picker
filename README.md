@@ -49,10 +49,20 @@ Custom places merge with the curated 47; they never overwrite `restaurants.json`
 The add bar searches as you type (debounced). Results prefer Coimbatore, Tamil Nadu.
 
 1. **Already on your list** — curated + custom names match first. Clicking jumps to that card instead of duplicating it (e.g. **The Living Room**).
-2. **Google Places Autocomplete (New)** — if you save an API key in **Places search / Google key**. Place Details may pre-fill area, coordinates, a Google ★, and a Maps link *only when Google returns those fields*.
-3. **Verified Coimbatore index** (`autocomplete-seed.json`) — attributed local dining spots OSM often lacks (e.g. **The Asian Stories**, Saibaba Colony). No invented ratings/hours/dishes.
-4. **OpenStreetMap** — Nominatim + Photon, food-filtered and name-matched. Junk “stores” fuzzy hits are dropped.
+2. **Verified Coimbatore index** (`autocomplete-seed.json`) — ranked **above** OpenStreetMap. OSM does not know **The Asian Stories**; the seed still suggests Saibaba Colony. No invented ratings/hours/dishes.
+3. **Google Places Autocomplete (New)** — if you save an API key in **Places search / Google key**. Place Details may pre-fill area, coordinates, a Google ★, and a Maps link *only when Google returns those fields*.
+4. **OpenStreetMap** — Nominatim + Photon only if **every query token** overlaps the place name. Photon fuzzy hits like “amutha/nalan stores” for “Asian Stories” are dropped. Supermarket / convenience / department_store / `shop=*` are banned unless the name strongly matches what you typed.
 5. **Never silent-empty** — queries of 2+ characters always show a dropdown, including **Add “{name}” as a custom place** when nothing else matches, plus a Google-key CTA if none is saved.
+
+### Preview this branch (avoid stale JS)
+
+`main` has **no** place-suggest UI. Use this PR branch, then **hard-refresh** so you are not looking at a cached `app.js` (that old file is why “Asian Stories” can still show store junk).
+
+- Windows/Linux: `Ctrl+Shift+R` · Mac: `Cmd+Shift+R`
+- Prefer a **commit-pinned** rawcdn URL (not the branch raw.githack URL, which caches):  
+  `https://rawcdn.githack.com/adith847/Restaurant-Picker/<commit-sha>/index.html`
+- Or open with a timestamp: `index.html?v=20260919-3`  
+  `app.js`, `styles.css`, `restaurants.json`, and `autocomplete-seed.json` are already loaded with `?v=20260919-3`.
 
 ### How Adi adds a Google key (optional)
 

@@ -6,6 +6,27 @@
   const SETTINGS_KEY = "cbe-picker-settings-v1";
   const CBE_CENTER = { lat: 11.0168, lng: 76.9558 };
   const CBE_RADIUS_KM = 40;
+  /** Bump when JS/JSON change so GitHub/raw.githack previews do not keep a stale app.js. */
+  const ASSET_V = "20260919-3";
+  /** Used if autocomplete-seed.json fails to load (common on cached previews). */
+  const FALLBACK_SEED = [
+    {
+      id: "seed-the-asian-stories",
+      name: "The Asian Stories",
+      aliases: ["Asian Stories", "The Asian Stories Saibaba Colony"],
+      area: "Saibaba Colony",
+      address:
+        "First Floor, No. 6, Bharathi Park 4th Cross Road, beside Jain Temple, Saibaba Colony, Coimbatore",
+      cuisine: "Pan-Asian",
+      type: "Restaurant",
+      lat: null,
+      lng: null,
+      sources: [
+        "https://www.zomato.com/coimbatore/the-asian-stories-saibaba-colony",
+        "https://www.swiggy.com/restaurants/coimbatore/sai-baba-colony/the-asian-stories-926542/dineout",
+      ],
+    },
+  ];
 
   /** Neighbourhood buckets so detailed hotel addresses still filter as RS Puram / Race Course / etc. */
   const AREA_RULES = [
@@ -997,6 +1018,28 @@
       .trim();
   }
 
+  function tokensOf(value) {
+    return nameKey(value)
+      .split(/\s+/)
+      .filter((t) => t.length >= 2);
+  }
+
+  function tokenCovered(queryToken, nameTokens) {
+    return nameTokens.some((nt) => {
+      if (nt === queryToken) return true;
+      if (queryToken.length >= 4 && nt.startsWith(queryToken)) return true;
+      return false;
+    });
+  }
+
+  /** Every meaningful query token must appear in the name (asian+stories ≠ amutha/nalan stores). */
+  function hasStrongTokenOverlap(query, name) {
+    const qTokens = tokensOf(query).filter((t) => t.length >= 3);
+    const nTokens = tokensOf(name);
+    if (!qTokens.length || !nTokens.length) return false;
+    return qTokens.every((qt) => tokenCovered(qt, nTokens));
+  }
+
   function nameMatchScore(query, name) {
     const q = nameKey(query);
     const n = nameKey(name);
@@ -1004,14 +1047,11 @@
     if (n === q) return 100;
     if (n.startsWith(q) || n.includes(` ${q}`)) return 90;
     if (n.includes(q) && q.length >= 4) return 80;
-    const qTokens = q.split(" ").filter((t) => t.length >= 2);
+    const qTokens = tokensOf(query);
     if (!qTokens.length) return 0;
-    const nTokens = n.split(" ");
-    const hits = qTokens.filter((t) =>
-      nTokens.some((nt) => nt === t || nt.startsWith(t))
-    );
+    const nTokens = tokensOf(name);
+    const hits = qTokens.filter((t) => tokenCovered(t, nTokens));
     if (hits.length === qTokens.length) return 75;
-    if (hits.length >= 1 && hits.length / qTokens.length >= 0.67) return 45;
     return 0;
   }
 
@@ -1257,8 +1297,10 @@
 
   function renderPlaceSuggest(items, { loading, providerHint, query } = {}) {
     const typed = (query || suggestQuery || addName.value).trim();
-    const rowsItems = [...items];
-    if (typed.length >= 2 && !rowsItems.some((item) => item.kind === "custom")) {
+    const rowsItems = [...items]
+      .filter((item) => item && item.kind !== "custom")
+      .sort((a, b) => suggestionPriority(a) - suggestionPriority(b));
+    if (typed.length >= 2) {
       rowsItems.push(customAddItem(typed));
     }
     suggestItems = rowsItems;
@@ -1321,42 +1363,78 @@
     }
   }
 
-  function mergeSuggestionLists(local, remote) {
-    const seen = new Set(local.map((item) => nameKey(item.name)));
-    const extra = [];
-    for (const item of remote) {
+  function suggestionPriority(item) {
+    if (!item) return 9;
+    if (item.kind === "local") return 0;
+    if (item.kind === "seed") return 1;
+    if (item.kind === "remote" && item.provider === "google") return 2;
+    if (item.kind === "remote") return 3;
+    if (item.kind === "custom") return 4;
+    return 5;
+  }
+
+  /** Local hits, then verified seed, then Google, then OSM. Never let Photon junk outrank seed. */
+  function mergeSuggestionLists(local, seed, remote) {
+    const combined = [...(local || []), ...(seed || []), ...(remote || [])].sort(
+      (a, b) => suggestionPriority(a) - suggestionPriority(b)
+    );
+    const seen = new Set();
+    const out = [];
+    for (const item of combined) {
       const key = nameKey(item.name);
-      if (key && seen.has(key) && findExistingPlace(item)) continue;
-      extra.push(item);
-      if (key) seen.add(key);
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      out.push(item);
+      if (out.length >= 8) break;
     }
-    return [...local, ...extra].slice(0, 8);
+    return out;
+  }
+
+  function osmTypeBlob(item) {
+    return [item.osmKey, item.osmValue, item.typeLabel, item.extra, item.category, item.name]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .replace(/_/g, " ");
   }
 
   function isFoodishOsm(item) {
-    const blob = `${item.typeLabel || ""} ${item.cuisine || ""} ${item.extra || ""} ${item.name || ""}`.toLowerCase();
+    const blob = osmTypeBlob(item);
+    return /\b(restaurant|cafe|café|bar|pub|bakery|bistro|food court|fast food|ice cream|meal|kitchen|mess|dhaba)\b/.test(
+      blob
+    );
+  }
+
+  function isShopOrStore(item) {
+    const blob = osmTypeBlob(item);
+    if (String(item.osmKey || "").toLowerCase() === "shop") return true;
     if (
-      /\b(restaurant|cafe|café|bar|pub|bakery|bistro|food court|fast food|ice cream|meal|kitchen|mess|dhaba)\b/.test(
+      /\b(supermarket|convenience|department store|grocery|greengrocer|mall|kiosk|clothes|hardware|electronics|general store)\b/.test(
         blob
       )
     ) {
       return true;
     }
-    return false;
+    return /\bstores?\b/.test(String(item.name || "").toLowerCase());
   }
 
   function isJunkOsm(item) {
-    const blob = `${item.typeLabel || ""} ${item.extra || ""} ${item.name || ""}`.toLowerCase();
+    const blob = osmTypeBlob(item);
     return /\b(supermarket|convenience|clothes|school|college|university|bank|hospital|parking|fuel|temple|place of worship|residential|hardware|electronics)\b/.test(
       blob
-    ) || /\bstores?\b/.test(item.name || "");
+    );
   }
 
   function keepOsmSuggestion(item, query) {
-    const score = nameMatchScore(query, item.name);
-    if (score >= 70 && !isJunkOsm(item)) return true;
-    if (isFoodishOsm(item) && score >= 45) return true;
-    return false;
+    if (!item || !item.name) return false;
+    if (!hasStrongTokenOverlap(query, item.name)) return false;
+    const strongName = nameMatchScore(query, item.name) >= 90;
+    if (isShopOrStore(item) && !strongName) return false;
+    if (isJunkOsm(item) && !strongName) return false;
+    if (isFoodishOsm(item)) return true;
+    return nameMatchScore(query, item.name) >= 80;
   }
 
   async function fetchGoogleAutocomplete(query, signal) {
@@ -1488,6 +1566,8 @@
       name: row.name || (row.display_name || "").split(",")[0],
       area: areaFromAddressParts(address),
       address: row.display_name || "",
+      osmKey: row.category || "",
+      osmValue: row.type || "",
       typeLabel: humanPlaceType(type),
       cuisine: cuisineFromType(type, row.extratags && row.extratags.cuisine),
       lat: Number.isFinite(lat) ? lat : null,
@@ -1522,6 +1602,8 @@
         city: props.city,
       }),
       address: hay,
+      osmKey: props.osm_key || "",
+      osmValue: props.osm_value || props.type || "",
       typeLabel: humanPlaceType(props.osm_value || props.type),
       cuisine: cuisineFromType(props.osm_value),
       lat: Number.isFinite(lat) ? lat : null,
@@ -1623,7 +1705,7 @@
     try {
       const remote = await fetchRemoteSuggestions(query, signal);
       if (addName.value.trim() !== query) return;
-      renderPlaceSuggest(mergeSuggestionLists(local, [...seed, ...remote]), {
+      renderPlaceSuggest(mergeSuggestionLists(local, seed, remote), {
         loading: false,
         providerHint: suggestProviderHint(),
         query,
@@ -1845,19 +1927,22 @@
     refreshPlacesProviderStatus();
     rebuildRestaurants();
     try {
-      const res = await fetch("restaurants.json");
+      const res = await fetch(`restaurants.json?v=${ASSET_V}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       curated = Array.isArray(data) ? data : data.restaurants || [];
       if (curated.length === 0) throw new Error("No restaurants in JSON");
       try {
-        const seedRes = await fetch("autocomplete-seed.json");
+        const seedRes = await fetch(`autocomplete-seed.json?v=${ASSET_V}`);
         if (seedRes.ok) {
           const seedData = await seedRes.json();
-          autocompleteSeed = Array.isArray(seedData) ? seedData : seedData.places || [];
+          const places = Array.isArray(seedData) ? seedData : seedData.places || [];
+          autocompleteSeed = places.length ? places : FALLBACK_SEED;
+        } else {
+          autocompleteSeed = FALLBACK_SEED;
         }
       } catch {
-        autocompleteSeed = [];
+        autocompleteSeed = FALLBACK_SEED;
       }
       rebuildRestaurants();
       refreshFilterOptions();
