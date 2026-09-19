@@ -863,8 +863,18 @@ h1 {
     flex: 1 1 100%;
   }
 
-  .field-narrow {
+  .add-form .field {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .add-form .field:nth-of-type(3) {
+    flex: 1 1 calc(58% - 0.35rem);
+  }
+
+  .add-form .field-narrow {
     max-width: none;
+    flex: 1 1 calc(42% - 0.35rem);
   }
 
   .action-row .btn {
